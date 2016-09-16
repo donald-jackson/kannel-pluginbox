@@ -1,0 +1,17 @@
+group = pluginbox
+bearerbox-host = localhost
+bearerbox-port = 13001
+smsbox-port = 13005
+smsbox-port-ssl = false
+log-file = "/var/log/kannel/kannel-pluginbox.log"
+log-level = 0
+#ssl-client-certkey-file = ""
+#ssl-server-cert-file = ""
+#ssl-server-key-file = ""
+#ssl-trusted-ca-file = ""
+
+
+group=pluginbox-plugin
+path=/opt/kannel/sbin/plugins/pluginbox_example.so
+init="pluginbox_example_init"
+priority=1

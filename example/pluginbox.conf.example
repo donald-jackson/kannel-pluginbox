@@ -11,7 +11,13 @@ log-level = 0
 #ssl-trusted-ca-file = ""
 
 
-group=pluginbox-plugin
-path=/opt/kannel/sbin/plugins/pluginbox_example.so
-init="pluginbox_example_init"
-priority=1
+
+## Example group for configuring an HTTP plugin
+#group=pluginbox-plugin
+#path=/opt/kannel/kannel-pluginbox/plugins/pluginbox_http.so
+#init="pluginbox_http_init"
+#priority=1
+#args="/opt/kannel/kannel-pluginbox/contrib/pluginbox_http/pluginbox_http.conf"
+#id=http1
+
+

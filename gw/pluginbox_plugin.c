@@ -93,6 +93,7 @@ PluginBoxPlugin *pluginbox_plugin_create() {
     pluginbox_plugin->path = NULL;
     pluginbox_plugin->args = NULL;
     pluginbox_plugin->shutdown = NULL;
+    pluginbox_plugin->id = NULL;
     return pluginbox_plugin;
 }
 
@@ -103,6 +104,7 @@ void pluginbox_plugin_destroy(PluginBoxPlugin *pluginbox_plugin) {
     
     octstr_destroy(pluginbox_plugin->path);
     octstr_destroy(pluginbox_plugin->args);
+    octstr_destroy(pluginbox_plugin->id);
     
     gw_free(pluginbox_plugin);
 }
@@ -173,6 +175,7 @@ int pluginbox_plugins_init(Cfg *cfg) {
         plugin->path = cfg_get(grp, octstr_imm("path"));
         plugin->priority = tmp_long;
         plugin->running_configuration = cfg;
+        plugin->id = cfg_get(grp, octstr_imm("id"));
 
         if (!octstr_len(plugin->path)) {
             panic(0, "No 'path' specified for pluginbox-plugin group");

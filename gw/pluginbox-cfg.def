@@ -76,4 +76,5 @@ MULTI_GROUP(pluginbox-plugin,
         OCTSTR(init)
         OCTSTR(events)
         OCTSTR(args)
+        OCTSTR(id)
 )

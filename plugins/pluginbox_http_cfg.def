@@ -52,59 +52,13 @@
  *
  * Portions of this software are based upon software originally written at
  * WapIT Ltd., Helsinki, Finland for the Kannel project.
- * 
- * 
+ *
+ *
  * @author Donald Jackson <djackson@kannel.org>
  */
 
-#ifndef PLUGINBOX_PLUGIN_H
-#define PLUGINBOX_PLUGIN_H
-
-#include "gw/msg.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-    
-#define PLUGINBOX_MESSAGE_OK 0
-#define PLUGINBOX_MESSAGE_REJECT -1
-    
-#define PLUGINBOX_MESSAGE_FROM_SMSBOX 1
-#define PLUGINBOX_MESSAGE_FROM_BEARERBOX 2
-    
-    typedef struct PluginBoxPlugin PluginBoxPlugin;
-    typedef struct PluginBoxMsg PluginBoxMsg;
-
-    struct PluginBoxPlugin {
-        Octstr *args;
-        int (*init)(PluginBoxPlugin *pluginbox_plugin);
-        void (*process)(PluginBoxPlugin *pluginbox_plugin, PluginBoxMsg *pluginbox_msg);
-        void (*shutdown)(PluginBoxPlugin *pluginbox_plugin);
-        void *context;
-        Octstr *path;
-        long priority;
-        long direction;
-        Cfg *running_configuration;
-        Octstr *id;
-    };
-    
-    struct PluginBoxMsg {
-        long chain;
-        Msg *msg;
-        int status;
-        void (*callback)(PluginBoxMsg *pluginbox_msg);
-        void (*done)(void *context, Msg *msg, int status);
-        void *context;
-        long type;
-    };
-    
-    int pluginbox_plugins_init(Cfg *cfg);
-    void pluginbox_plugin_shutdown();
-    void pluginbox_plugins_start(void (*done)(void *context, Msg *msg, int status), void *context, Msg *msg, long type);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif /* PLUGINBOX_PLUGIN_H */
-
+MULTI_GROUP(pluginbox-http,
+    OCTSTR(id)
+    OCTSTR(url)
+    OCTSTR(max-pending-requests)
+)

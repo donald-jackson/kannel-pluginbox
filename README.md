@@ -26,7 +26,7 @@ make install
 
 Included plugins
 ============
-For example purposes I have included an HTTP plugin which can intercept all messages to and from Kannel.
+For example purposes I have included an HTTP plugin which can intercept all messages to and from Kannel and forward them to an HTTP URL. In the headers will be included all the parameters of the message, which can then be changed by the HTTP server or simply reject the message.
 
 Please see [contrib/plugin-http/pluginbox_http.conf](https://github.com/donald-jackson/kannel-pluginbox/blob/master/contrib/plugin-http/pluginbox_http.conf) as well as [example/pluginbox.conf.example](https://github.com/donald-jackson/kannel-pluginbox/blob/master/example/pluginbox.conf.example) for an example of how to configure.
 

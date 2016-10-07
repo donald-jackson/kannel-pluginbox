@@ -15,7 +15,31 @@ if (!function_exists('getallheaders'))
     }
 }
 
+/** Full received header list is below (overwrite by returning same header key/values) **/
 
+/**
+  'X-Kannel-Plugin-Msg-Type' => 'sms',
+  'X-Kannel-Plugin-Msg-Sms-Sender' => '33333',
+  'X-Kannel-Plugin-Msg-Sms-Receiver' => '1234567891',
+  'X-Kannel-Plugin-Msg-Sms-Udhdata' => '',
+  'X-Kannel-Plugin-Msg-Sms-Msgdata' => 'Hello',
+  'X-Kannel-Plugin-Msg-Sms-Time' => '1475831852',
+  'X-Kannel-Plugin-Msg-Sms-Service' => 'tester',
+  'X-Kannel-Plugin-Msg-Sms-Account' => '(null)',
+  'X-Kannel-Plugin-Msg-Sms-Id' => '08f5cdaa-8cf7-4775-0100-10070000000b',
+  'X-Kannel-Plugin-Msg-Sms-Mclass' => '-1',
+  'X-Kannel-Plugin-Msg-Sms-Mwi' => '-1',
+  'X-Kannel-Plugin-Msg-Sms-Coding' => '0',
+  'X-Kannel-Plugin-Msg-Sms-Compress' => '-1',
+  'X-Kannel-Plugin-Msg-Sms-Validity' => '-1',
+  'X-Kannel-Plugin-Msg-Sms-Deferred' => '-1',
+  'X-Kannel-Plugin-Msg-Sms-Pid' => '-1',
+  'X-Kannel-Plugin-Msg-Sms-Rpi' => '-1',
+  'X-Kannel-Plugin-Msg-Sms-Charset' => '(null)',
+  'X-Kannel-Plugin-Msg-Sms-Binfo' => '(null)',
+  'X-Kannel-Plugin-Msg-Sms-Priority' => '-1',
+
+**/
 
 $headers = getallheaders();
 

@@ -30,7 +30,7 @@ For example purposes I have included an HTTP plugin which can intercept all mess
 
 Please see contrib/plugin-http/pluginbox_http.conf as well as example/pluginbox.conf.example for an example of how to configure.
 
-There is also a PHP script example showing how to reject messages as well as modify parameters of the message structures in contrib/plugin-http/http-processor.php
+There is also a PHP script example showing how to reject messages as well as modify parameters of the message structures in (contrib/plugin-http/http-processor.php)[https://github.com/donald-jackson/kannel-pluginbox/blob/master/contrib/plugin-http/http-processor.php]
 
 You need to have a compiled version of Kannel available in order to compile
 pluginbox.

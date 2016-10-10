@@ -345,6 +345,7 @@ void pluginbox_http_modify_with_headers(Msg *msg, List *headers)
      if(value != NULL) { \
         octstr_destroy(p->name); \
         p->name = octstr_duplicate(value); \
+        octstr_url_decode(p->name); \
         debug("pluginbox.http.modify.with.headers", 0, PLUGINBOX_LOG_PREFIX "Found header %s and set to value %s ", octstr_get_cstr(key), octstr_get_cstr(p->name)); \
     } else { \
         debug("pluginbox.http.modify.with.headers", 0, PLUGINBOX_LOG_PREFIX "No header found for %s", octstr_get_cstr(key)); \
@@ -392,7 +393,7 @@ List *pluginbox_http_get_headers_for_msg(Msg *msg)
     char uuid[UUID_STR_LEN+1];
 
 #define INTEGER(name) value = octstr_format("%ld", p->name); key = octstr_format("%S-%s", prefix, #name); http_header_add(headers, octstr_get_cstr(key), octstr_get_cstr(value)); octstr_destroy(key); octstr_destroy(value);
-#define OCTSTR(name) value = octstr_format("%S", p->name); key = octstr_format("%S-%s", prefix, #name); http_header_add(headers, octstr_get_cstr(key), octstr_get_cstr(value)); octstr_destroy(key); octstr_destroy(value);
+#define OCTSTR(name) value = octstr_format("%E", p->name); key = octstr_format("%S-%s", prefix, #name); http_header_add(headers, octstr_get_cstr(key), octstr_get_cstr(value)); octstr_destroy(key); octstr_destroy(value);
 #define UUID(name) uuid_unparse(p->name, uuid); value = octstr_format("%s", uuid); key = octstr_format("%S-%s", prefix, #name); http_header_add(headers, octstr_get_cstr(key), octstr_get_cstr(value)); octstr_destroy(key); octstr_destroy(value);
 #define VOID(name) ;
 #define MSG(type, stmt) \

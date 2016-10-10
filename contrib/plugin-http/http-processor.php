@@ -43,6 +43,10 @@ if (!function_exists('getallheaders'))
 
 $headers = getallheaders();
 
+foreach($headers as $key => $value) {
+    $headers[$key] = urldecode($value);
+}
+
 $sender = $headers['X-Kannel-Plugin-Msg-Sms-Sender'];
 $receiver = $headers['X-Kannel-Plugin-Msg-Sms-Receiver'];
 
@@ -60,7 +64,7 @@ if($sender == '11111') {
 
 if($receiver == '1234567890') {
     /* Changing the message content */
-    Header("X-Kannel-Plugin-Msg-Sms-Msgdata: I changed the message data");
+    Header("X-Kannel-Plugin-Msg-Sms-Msgdata: ".urlencode("I changed the message data"));
     Header("X-Kannel-Plugin-Msg-Sms-Priority: 1");
     exit(0);
 }

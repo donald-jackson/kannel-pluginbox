@@ -1,0 +1,14 @@
+group = sqlbox
+id = cdrplugin-db
+sql-log-table = sent_sms
+save-mo = 1
+save-mt = 1
+save-dlr = 1
+
+group = mysql-connection
+id = cdrplugin-db
+host = localhost
+username = kannel
+password = secret
+database = kannel
+max-connections = 1

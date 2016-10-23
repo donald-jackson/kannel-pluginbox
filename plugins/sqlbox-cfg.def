@@ -1,0 +1,16 @@
+/* ==================================================================
+ * Sqlbox-cfg.def - Definition of configuration groups and variables
+ *
+ * Martin Conte
+ *
+ */
+
+SINGLE_GROUP(sqlbox,
+    OCTSTR(id)
+    OCTSTR(sql-log-table)
+    OCTSTR(log-file)
+    OCTSTR(log-level)
+    OCTSTR(save-mo)
+    OCTSTR(save-mt)
+    OCTSTR(save-dlr)
+)

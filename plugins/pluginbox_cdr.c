@@ -59,8 +59,8 @@
 
 #include "gwlib/gwlib.h"
 #include "gw/pluginbox_plugin.h"
-#include "sqlbox_sql.inc"
-#include "sqlbox_mysql.inc"
+#include "sqlbox/sqlbox_sql.inc"
+#include "sqlbox/sqlbox_mysql.inc"
 
 typedef struct {
 	Octstr *id;
@@ -108,7 +108,7 @@ static int sqlbox_is_allowed_in_group(Octstr *group, Octstr *variable)
         fields \
         return 0; \
     }
-    #include "sqlbox-cfg.def"
+    #include "sqlbox/sqlbox-cfg.def"
 
     return 0;
 }
@@ -126,7 +126,7 @@ static int sqlbox_is_single_group(Octstr *query)
     #define MULTI_GROUP(name, fields) \
         if (octstr_compare(octstr_imm(#name), query) == 0) \
         return 0;
-    #include "sqlbox-cfg.def"
+    #include "sqlbox/sqlbox-cfg.def"
     return 0;
 }
 

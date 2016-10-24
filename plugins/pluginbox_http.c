@@ -122,7 +122,7 @@ static int pluginbox_http_is_allowed_in_group(Octstr *group, Octstr *variable) {
         fields \
         return 0; \
     }
-#include "pluginbox_http_cfg.def"
+#include "http/pluginbox_http_cfg.def"
 
     return 0;
 }
@@ -139,7 +139,7 @@ static int pluginbox_is_single_group(Octstr *query) {
 #define MULTI_GROUP(name, fields) \
         if (octstr_compare(octstr_imm(#name), query) == 0) \
         return 0;
-#include "pluginbox_http_cfg.def"
+#include "http/pluginbox_http_cfg.def"
     return 0;
 }
 

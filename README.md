@@ -7,6 +7,21 @@ allows plugins to execute and manipulate messages in both directions.
 Pluginbox behaves similar to other Kannel boxes and share a compatible
 configuration file format and command line options.
 
+
+Requirements
+============
+Before you can compile pluginbox and plugins you need a Kannel version installed on your OS with the -fPIC flag set.
+
+To do this, you can just follow the commands below:
+
+```
+svn checkout https://svn.kannel.org/gateway/trunk kannel-svn
+cd kannel-svn
+CFLAGS="-fPIC" ./configure
+make
+sudo make install
+```
+
 Installation
 ============
 Please read the INSTALL file for further instructions. If in a hurry, the quick

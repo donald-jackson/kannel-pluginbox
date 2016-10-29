@@ -18,53 +18,55 @@ if (!function_exists('getallheaders'))
 /** Full received header list is below (overwrite by returning same header key/values) **/
 
 /**
-  'X-Kannel-Plugin-Msg-Type' => 'sms',
-  'X-Kannel-Plugin-Msg-Sms-Sender' => '33333',
-  'X-Kannel-Plugin-Msg-Sms-Receiver' => '1234567891',
-  'X-Kannel-Plugin-Msg-Sms-Udhdata' => '',
-  'X-Kannel-Plugin-Msg-Sms-Msgdata' => 'Hello',
-  'X-Kannel-Plugin-Msg-Sms-Time' => '1475831852',
-  'X-Kannel-Plugin-Msg-Sms-Service' => 'tester',
-  'X-Kannel-Plugin-Msg-Sms-Account' => '(null)',
-  'X-Kannel-Plugin-Msg-Sms-Id' => '08f5cdaa-8cf7-4775-0100-10070000000b',
-  'X-Kannel-Plugin-Msg-Sms-Mclass' => '-1',
-  'X-Kannel-Plugin-Msg-Sms-Mwi' => '-1',
-  'X-Kannel-Plugin-Msg-Sms-Coding' => '0',
-  'X-Kannel-Plugin-Msg-Sms-Compress' => '-1',
-  'X-Kannel-Plugin-Msg-Sms-Validity' => '-1',
-  'X-Kannel-Plugin-Msg-Sms-Deferred' => '-1',
-  'X-Kannel-Plugin-Msg-Sms-Pid' => '-1',
-  'X-Kannel-Plugin-Msg-Sms-Rpi' => '-1',
-  'X-Kannel-Plugin-Msg-Sms-Charset' => '(null)',
-  'X-Kannel-Plugin-Msg-Sms-Binfo' => '(null)',
-  'X-Kannel-Plugin-Msg-Sms-Priority' => '-1',
+  'x-kannel-plugin-msg-type' => 'sms',
+  'x-kannel-plugin-msg-sms-sender' => '33333',
+  'x-kannel-plugin-msg-sms-receiver' => '1234567891',
+  'x-kannel-plugin-msg-sms-udhdata' => '',
+  'x-kannel-plugin-msg-sms-msgdata' => 'hello',
+  'x-kannel-plugin-msg-sms-time' => '1475831852',
+  'x-kannel-plugin-msg-sms-service' => 'tester',
+  'x-kannel-plugin-msg-sms-account' => '(null)',
+  'x-kannel-plugin-msg-sms-id' => '08f5cdaa-8cf7-4775-0100-10070000000b',
+  'x-kannel-plugin-msg-sms-mclass' => '-1',
+  'x-kannel-plugin-msg-sms-mwi' => '-1',
+  'x-kannel-plugin-msg-sms-coding' => '0',
+  'x-kannel-plugin-msg-sms-compress' => '-1',
+  'x-kannel-plugin-msg-sms-validity' => '-1',
+  'x-kannel-plugin-msg-sms-deferred' => '-1',
+  'x-kannel-plugin-msg-sms-pid' => '-1',
+  'x-kannel-plugin-msg-sms-rpi' => '-1',
+  'x-kannel-plugin-msg-sms-charset' => '(null)',
+  'x-kannel-plugin-msg-sms-binfo' => '(null)',
+  'x-kannel-plugin-msg-sms-priority' => '-1',
 
 **/
 
-$headers = getallheaders();
+$original_headers = getallheaders();
 
-foreach($headers as $key => $value) {
-    $headers[$key] = urldecode($value);
+$headers = array();
+foreach($original_headers as $key => $value) {
+  $key = strtolower($key);
+  $headers[$key] = urldecode($value);
 }
 
-$sender = $headers['X-Kannel-Plugin-Msg-Sms-Sender'];
-$receiver = $headers['X-Kannel-Plugin-Msg-Sms-Receiver'];
+$sender = $headers['x-kannel-plugin-msg-sms-sender'];
+$receiver = $headers['x-kannel-plugin-msg-sms-receiver'];
 
 if($sender == '12345') {
     /* Decline this message */
-    header("Status: 404 Not Found");
+    header("HTTP/1.0 404 Not Found");
     exit(0);
 }
 
 if($sender == '11111') {
     /* Change the sender to 22222 */
-    Header("X-Kannel-Plugin-Msg-Sms-Sender: 22222");
+    header("x-kannel-plugin-msg-sms-sender: 22222");
     exit(0);
 }
 
 if($receiver == '1234567890') {
     /* Changing the message content */
-    Header("X-Kannel-Plugin-Msg-Sms-Msgdata: ".urlencode("I changed the message data"));
-    Header("X-Kannel-Plugin-Msg-Sms-Priority: 1");
+    header("x-kannel-plugin-msg-sms-msgdata: ".urlencode("I changed the message data"));
+    header("x-kannel-plugin-msg-sms-priority: 1");
     exit(0);
 }

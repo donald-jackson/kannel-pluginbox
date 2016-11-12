@@ -65,6 +65,7 @@
 static List *smsbox_inbound_plugins;
 static List *bearerbox_inbound_plugins;
 static List *all_plugins;
+RWLock *configurationlock;
 
 PluginBoxMsg *pluginbox_msg_create() {
     PluginBoxMsg *pluginbox_msg = gw_malloc(sizeof (PluginBoxMsg));
@@ -117,6 +118,9 @@ void pluginbox_plugins_done(PluginBoxMsg *pluginbox_msg) {
     pluginbox_msg_destroy(pluginbox_msg);
 }
 
+/* TODO: There is a known race condition here. If a plugin is removed/added from the chain, the pluginbox_msg->chain counter dangles.
+ * This means that for pending messages, one or more plugins are skipped or called twice.
+*/
 void pluginbox_plugins_next(PluginBoxMsg *pluginbox_msg) {
     List *target = NULL;
     if (pluginbox_msg->type & PLUGINBOX_MESSAGE_FROM_SMSBOX) {
@@ -126,6 +130,7 @@ void pluginbox_plugins_next(PluginBoxMsg *pluginbox_msg) {
         target = bearerbox_inbound_plugins;
     }
     
+    gw_rwlock_rdlock(configurationlock);
     if((target != NULL) && (pluginbox_msg->status != PLUGINBOX_MESSAGE_REJECT)) {
         long len = gwlist_len(target);
         if(pluginbox_msg->chain < len) {
@@ -134,10 +139,12 @@ void pluginbox_plugins_next(PluginBoxMsg *pluginbox_msg) {
             if(plugin != NULL) {
                 ++pluginbox_msg->chain;
                 plugin->process(plugin, pluginbox_msg);
+		gw_rwlock_unlock(configurationlock);
                 return;
             }
         }
     }
+    gw_rwlock_unlock(configurationlock);
     pluginbox_plugins_done(pluginbox_msg);
 }
 
@@ -155,6 +162,7 @@ void pluginbox_plugins_start(void (*done)(void *context, Msg *msg, int status), 
 
 static PluginBoxPlugin *pluginbox_plugins_add(Cfg *cfg, Octstr *id, CfgGroup *grp)
 {
+	/* we assume the configuration is write-locked */
 	long tmp_long;
 	void *lib;
 	char *error_str;
@@ -202,6 +210,7 @@ static PluginBoxPlugin *pluginbox_plugins_add(Cfg *cfg, Octstr *id, CfgGroup *gr
 }
 
 int pluginbox_plugins_init(Cfg *cfg) {
+    configurationlock = gw_rwlock_create();
     smsbox_inbound_plugins = gwlist_create();
     bearerbox_inbound_plugins = gwlist_create();
     all_plugins = gwlist_create();
@@ -214,6 +223,7 @@ int pluginbox_plugins_init(Cfg *cfg) {
     CfgGroup *grp;
     Octstr *id;
 
+    gw_rwlock_wrlock(configurationlock);
     while (grplist && (grp = gwlist_extract_first(grplist)) != NULL) {
 	id = cfg_get(grp, octstr_imm("id"));
 	if (cfg_get_bool(&tmp_dead, grp, octstr_imm("dead-start")) != -1) {
@@ -243,6 +253,7 @@ int pluginbox_plugins_init(Cfg *cfg) {
     gwlist_destroy(grplist, NULL);
     
     gw_prioqueue_destroy(prioqueue, NULL);
+    gw_rwlock_unlock(configurationlock);
 }
 
 void pluginbox_plugin_shutdown() {
@@ -250,12 +261,14 @@ void pluginbox_plugin_shutdown() {
     gwlist_destroy(bearerbox_inbound_plugins, NULL);
     
     gwlist_destroy(all_plugins, (void (*)(void *))pluginbox_plugin_destroy);
+    gw_rwlock_destroy(configurationlock);
 }
 
 /* http admin functions */
 
 static PluginBoxPlugin *find_plugin(Octstr *plugin)
 {
+	/* we assume the list is read-locked */
 	int i;
 	PluginBoxPlugin *res;
 
@@ -278,6 +291,7 @@ int pluginbox_remove_plugin(Octstr *pluginname)
 	int i;
 	PluginBoxPlugin *plugin;
 
+	gw_rwlock_wrlock(configurationlock);
 	for (i = 0; i < gwlist_len(smsbox_inbound_plugins); i++) {
 		plugin = gwlist_get(all_plugins, i);
 		if (octstr_compare(pluginname, plugin->id) == 0) {
@@ -299,9 +313,11 @@ int pluginbox_remove_plugin(Octstr *pluginname)
 		if (octstr_compare(pluginname, plugin->id) == 0) {
 			pluginbox_plugin_destroy(plugin);
 			gwlist_delete(all_plugins, i, 1);
+			gw_rwlock_unlock(configurationlock);
 			return 1;
 		}
 	}
+	gw_rwlock_unlock(configurationlock);
         debug("pluginbox.plugin.remove", 0, "Plugin %s not found.", octstr_get_cstr(pluginname));
 	return 0;
 }
@@ -315,9 +331,11 @@ int pluginbox_add_plugin(Cfg *cfg, Octstr *pluginname)
     int found = 0;
     int i;
 
+    gw_rwlock_wrlock(configurationlock);
     for (i = 0; i < gwlist_len(all_plugins); i++) {
 	plugin = gwlist_get(all_plugins, i);
 	if (octstr_compare(pluginname, plugin->id) == 0) {
+    	    gw_rwlock_unlock(configurationlock);
             debug("pluginbox.plugin.add", 0, "Plugin %s already added.", octstr_get_cstr(plugin->id));
 	    return 0;
 	}
@@ -348,6 +366,7 @@ int pluginbox_add_plugin(Cfg *cfg, Octstr *pluginname)
             gwlist_produce(bearerbox_inbound_plugins, plugin);
         }
     }
+    gw_rwlock_unlock(configurationlock);
     
     gwlist_destroy(grplist, NULL);
     
@@ -358,11 +377,17 @@ int pluginbox_add_plugin(Cfg *cfg, Octstr *pluginname)
 Octstr *pluginbox_status_plugin(Octstr *pluginname, List *cgivars, int status_type)
 {
 	PluginBoxPlugin *plugin;
+	Octstr *res;
+
+	gw_rwlock_rdlock(configurationlock);
 	if (NULL == (plugin = find_plugin(pluginname))) {
-		return nosuchplugin(pluginname, status_type);
+		res = nosuchplugin(pluginname, status_type);
+	} else if (NULL != plugin->status) {
+		res = plugin->status(plugin, cgivars, status_type);
 	}
-	if (NULL != plugin->status) {
-		return plugin->status(plugin, cgivars, status_type);
+	else {
+		res = octstr_create("Plugin doesnt support status querying.\n");
 	}
-	return octstr_create("dummy");
+	gw_rwlock_unlock(configurationlock);
+	return res;
 }

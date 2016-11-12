@@ -72,6 +72,7 @@
 #include "pluginbox_plugin.h"
 
 /* our config */
+static Octstr *cfg_filename = NULL;
 static Cfg *cfg;
 /* have we received restart cmd from bearerbox? */
 
@@ -733,7 +734,6 @@ static int check_args(int i, int argc, char **argv) {
 
 int main(int argc, char **argv) {
     int cf_index;
-    Octstr *filename;
 
     gwlib_init();
 
@@ -741,21 +741,19 @@ int main(int argc, char **argv) {
     setup_signal_handlers();
 
     if (argv[cf_index] == NULL) {
-        filename = octstr_create("pluginbox.conf");
+        cfg_filename = octstr_create("pluginbox.conf");
     } else {
-        filename = octstr_create(argv[cf_index]);
+        cfg_filename = octstr_create(argv[cf_index]);
     }
 
-    cfg = cfg_create(filename);
+    cfg = cfg_create(cfg_filename);
 
     /* Adding cfg-checks to core */
 
     cfg_add_hooks(pluginbox_is_allowed_in_group, pluginbox_is_single_group);
 
     if (cfg_read(cfg) == -1)
-        panic(0, "Couldn't read configuration from `%s'.", octstr_get_cstr(filename));
-
-    octstr_destroy(filename);
+        panic(0, "Couldn't read configuration from `%s'.", octstr_get_cstr(cfg_filename));
 
     report_versions("pluginbox");
 
@@ -775,6 +773,8 @@ int main(int argc, char **argv) {
     pluginbox_plugin_shutdown();
 
     gwlib_shutdown();
+
+    if (NULL != cfg_filename) octstr_destroy(cfg_filename);
 
     if (restart_pluginbox)
         execvp(argv[0], argv);
@@ -811,21 +811,6 @@ Octstr *plugin_print_status(int status_type)
 	return octstr_format(frmt, "status");
 }
 
-int plugin_stop_plugin(Octstr *plugin)
-{
-	return pluginbox_stop_plugin(plugin);
-}
-
-int plugin_start_plugin(Octstr *plugin)
-{
-	return pluginbox_start_plugin(plugin);
-}
-
-int plugin_restart_plugin(Octstr *plugin)
-{
-	return 1;
-}
-
 int plugin_remove_plugin(Octstr *plugin)
 {
 	return pluginbox_remove_plugin(plugin);
@@ -833,7 +818,23 @@ int plugin_remove_plugin(Octstr *plugin)
 
 int plugin_add_plugin(Octstr *plugin)
 {
-	return pluginbox_add_plugin(plugin);
+    Cfg *cfg;
+
+    cfg = cfg_create(cfg_filename);
+
+    /* Adding cfg-checks to core */
+
+    if (cfg_read(cfg) == -1)
+        panic(0, "Couldn't read configuration from `%s'.", octstr_get_cstr(cfg_filename));
+
+    return pluginbox_add_plugin(cfg, plugin);
+}
+
+int plugin_restart_plugin(Octstr *plugin)
+{
+	int dummy;
+	dummy = plugin_remove_plugin(plugin);
+	return plugin_add_plugin(plugin);
 }
 
 Octstr *plugin_status_plugin(Octstr *plugin, List *cgivars, int status_type)

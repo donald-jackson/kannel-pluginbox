@@ -87,8 +87,6 @@ enum {
 };
 
 Octstr *plugin_print_status(int status_type);
-int plugin_stop_plugin(Octstr *plugin);
-int plugin_start_plugin(Octstr *plugin);
 int plugin_remove_plugin(Octstr *plugin);
 int plugin_add_plugin(Octstr *plugin);
 int plugin_restart_plugin(Octstr *plugin);

@@ -74,6 +74,11 @@ void pluginbox_example_process(PluginBoxPlugin *pluginbox_plugin, PluginBoxMsg *
     pluginbox_msg->callback(pluginbox_msg);
 }
 
+Octstr *pluginbox_example_status(PluginBoxPlugin *pluginbox_plugin, List *cgivars, int status_type)
+{
+    return octstr_create("Status of example plugin.\n");
+}
+
 int pluginbox_example_init(PluginBoxPlugin *pluginbox_plugin) {
     
     info(0, "Initializing example plugin");
@@ -81,6 +86,7 @@ int pluginbox_example_init(PluginBoxPlugin *pluginbox_plugin) {
     pluginbox_plugin->process = pluginbox_example_process;
     pluginbox_plugin->direction = PLUGINBOX_MESSAGE_FROM_SMSBOX | PLUGINBOX_MESSAGE_FROM_BEARERBOX;
     pluginbox_plugin->shutdown = pluginbox_example_shutdown;
+    pluginbox_plugin->status = pluginbox_example_status;
     
     return 1;
 }

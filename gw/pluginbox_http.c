@@ -151,24 +151,6 @@ static Octstr *httpd_loglevel(List *cgivars, int status_type)
     }
 }
 
-static Octstr *httpd_stop_plugin(List *cgivars, int status_type)
-{
-    Octstr *reply;
-    Octstr *plugin;
-    if ((reply = httpd_check_authorization(cgivars, 0))!= NULL) return reply;
-    if ((reply = httpd_check_status())!= NULL) return reply;
-
-    /* check if the plugin id is given */
-    plugin = http_cgi_variable(cgivars, "plugin");
-    if (plugin) {
-        if (plugin_stop_plugin(plugin) == -1)
-            return octstr_format("Could not shut down plugin-id `%s'", octstr_get_cstr(plugin));
-        else
-            return octstr_format("PLUGIN `%s' shut down", octstr_get_cstr(plugin));
-    } else
-        return octstr_create("PLUGIN id not given");
-}
-
 static Octstr *httpd_remove_plugin(List *cgivars, int status_type)
 {
     Octstr *reply;
@@ -214,28 +196,10 @@ static Octstr *httpd_add_plugin(List *cgivars, int status_type)
     /* check if the plugin id is given */
     plugin = http_cgi_variable(cgivars, "plugin");
     if (plugin) {
-        if (plugin_add_plugin(plugin) == -1)
+        if (plugin_add_plugin(plugin) == 0)
             return octstr_format("Could not add plugin-id `%s'", octstr_get_cstr(plugin));
         else
             return octstr_format("PLUGIN `%s' added", octstr_get_cstr(plugin));
-    } else
-        return octstr_create("PLUGIN id not given");
-}
-
-static Octstr *httpd_start_plugin(List *cgivars, int status_type)
-{
-    Octstr *reply;
-    Octstr *plugin;
-    if ((reply = httpd_check_authorization(cgivars, 0))!= NULL) return reply;
-    if ((reply = httpd_check_status())!= NULL) return reply;
-
-    /* check if the plugin id is given */
-    plugin = http_cgi_variable(cgivars, "plugin");
-    if (plugin) {
-        if (plugin_start_plugin(plugin) == -1)
-            return octstr_format("Could not re-start plugin-id `%s'", octstr_get_cstr(plugin));
-        else
-            return octstr_format("PLUGIN `%s' re-started", octstr_get_cstr(plugin));
     } else
         return octstr_create("PLUGIN id not given");
 }
@@ -265,8 +229,6 @@ static struct httpd_command {
 } httpd_commands[] = {
     { "status", httpd_status },
     { "log-level", httpd_loglevel },
-    { "stop-plugin", httpd_stop_plugin },
-    { "start-plugin", httpd_start_plugin },
     { "restart-plugin", httpd_restart_plugin },
     { "add-plugin", httpd_add_plugin },
     { "remove-plugin", httpd_remove_plugin },

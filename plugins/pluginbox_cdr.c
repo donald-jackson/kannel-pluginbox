@@ -251,6 +251,11 @@ error:
 }
 #endif
 
+Octstr *pluginbox_cdr_status(PluginBoxPlugin *pluginbox_plugin, List *cgivars, int status_type)
+{
+	return octstr_create("cdr status\n");
+}
+
 int pluginbox_cdr_init(PluginBoxPlugin *pluginbox_plugin) {
 	info(0, PLUGINBOX_LOG_PREFIX "Using configuration from %s", octstr_get_cstr(pluginbox_plugin->args));
 	cfg_add_hooks(sqlbox_is_allowed_in_group, sqlbox_is_single_group);
@@ -269,6 +274,7 @@ int pluginbox_cdr_init(PluginBoxPlugin *pluginbox_plugin) {
 	pluginbox_plugin->direction = PLUGINBOX_MESSAGE_FROM_SMSBOX | PLUGINBOX_MESSAGE_FROM_BEARERBOX;
 	pluginbox_plugin->process = pluginbox_cdr_process;
 	pluginbox_plugin->shutdown = pluginbox_cdr_shutdown;
+	pluginbox_plugin->status = pluginbox_cdr_status;
 	return 1;
 }
 

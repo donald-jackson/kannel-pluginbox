@@ -93,8 +93,8 @@ PluginBoxPlugin *pluginbox_plugin_create() {
     pluginbox_plugin->path = NULL;
     pluginbox_plugin->args = NULL;
     pluginbox_plugin->shutdown = NULL;
+    pluginbox_plugin->status = NULL;
     pluginbox_plugin->id = NULL;
-    pluginbox_plugin->started = 0;
     return pluginbox_plugin;
 }
 
@@ -103,9 +103,9 @@ void pluginbox_plugin_destroy(PluginBoxPlugin *pluginbox_plugin) {
         pluginbox_plugin->shutdown(pluginbox_plugin);
     }
     
-    octstr_destroy(pluginbox_plugin->path);
-    octstr_destroy(pluginbox_plugin->args);
-    octstr_destroy(pluginbox_plugin->id);
+    if (NULL != pluginbox_plugin->path) octstr_destroy(pluginbox_plugin->path);
+    if (NULL != pluginbox_plugin->args) octstr_destroy(pluginbox_plugin->args);
+    if (NULL != pluginbox_plugin->id) octstr_destroy(pluginbox_plugin->id);
     
     gw_free(pluginbox_plugin);
 }
@@ -131,7 +131,7 @@ void pluginbox_plugins_next(PluginBoxMsg *pluginbox_msg) {
         if(pluginbox_msg->chain < len) {
             /* We're OK */
             PluginBoxPlugin *plugin = gwlist_get(target, pluginbox_msg->chain);
-            if(plugin != NULL && plugin->started != 0) {
+            if(plugin != NULL) {
                 ++pluginbox_msg->chain;
                 plugin->process(plugin, pluginbox_msg);
                 return;
@@ -153,33 +153,23 @@ void pluginbox_plugins_start(void (*done)(void *context, Msg *msg, int status), 
 
 }
 
-int pluginbox_plugins_init(Cfg *cfg) {
-    smsbox_inbound_plugins = gwlist_create();
-    bearerbox_inbound_plugins = gwlist_create();
-    all_plugins = gwlist_create();
+static PluginBoxPlugin *pluginbox_plugins_add(Cfg *cfg, Octstr *id, CfgGroup *grp)
+{
+	long tmp_long;
+	void *lib;
+	char *error_str;
+	Octstr *tmp_str, *path;
 
-    gw_prioqueue_t *prioqueue = gw_prioqueue_create((int(*)(const void *, const void *))pluginbox_plugin_compare);
-
-    char *error_str;
-    void *lib;
-    Octstr *tmp_str, *path;
-    long tmp_long;
-    List *grplist = cfg_get_multi_group(cfg, octstr_imm("pluginbox-plugin"));
-    PluginBoxPlugin *plugin;
-    CfgGroup *grp;
-    while (grplist && (grp = gwlist_extract_first(grplist)) != NULL) {
         if (cfg_get_integer(&tmp_long, grp, octstr_imm("priority")) == -1) {
             tmp_long = 0;
         }
 
+	PluginBoxPlugin *plugin;
         plugin = pluginbox_plugin_create();
+        plugin->id = id;
         plugin->path = cfg_get(grp, octstr_imm("path"));
         plugin->priority = tmp_long;
         plugin->running_configuration = cfg;
-        plugin->id = cfg_get(grp, octstr_imm("id"));
-	if (cfg_get_integer(&(plugin->started), grp, octstr_imm("dead-start")) == -1) {
-		plugin->started = 1;
-	}
 
         if (!octstr_len(plugin->path)) {
             panic(0, "No 'path' specified for pluginbox-plugin group");
@@ -199,29 +189,53 @@ int pluginbox_plugins_init(Cfg *cfg) {
                 panic(0, "init-function %s unable to load from %s", octstr_get_cstr(tmp_str), octstr_get_cstr(plugin->path));
             }
             plugin->args = cfg_get(grp, octstr_imm("args"));
-	    if (plugin->started) {
-            	if (!plugin->init(plugin)) {
-                	panic(0, "Plugin %s initialization failed", octstr_get_cstr(plugin->path));
-            	} else {
-                	info(0, "Plugin %s initialized priority %ld", octstr_get_cstr(plugin->path), plugin->priority);
-                	gw_prioqueue_produce(prioqueue, plugin);
-		}
+            if (!plugin->init(plugin)) {
+               	panic(0, "Plugin %s initialization failed", octstr_get_cstr(plugin->path));
+            } else {
+               	info(0, "Plugin %s initialized priority %ld", octstr_get_cstr(plugin->path), plugin->priority);
             }
         } else {
             panic(0, "No initialization 'init' function specified, cannot continue (%s)", octstr_get_cstr(plugin->path));
         }
         octstr_destroy(tmp_str);
+	return plugin;
+}
+
+int pluginbox_plugins_init(Cfg *cfg) {
+    smsbox_inbound_plugins = gwlist_create();
+    bearerbox_inbound_plugins = gwlist_create();
+    all_plugins = gwlist_create();
+
+    gw_prioqueue_t *prioqueue = gw_prioqueue_create((int(*)(const void *, const void *))pluginbox_plugin_compare);
+
+    int tmp_dead;
+    List *grplist = cfg_get_multi_group(cfg, octstr_imm("pluginbox-plugin"));
+    PluginBoxPlugin *plugin;
+    CfgGroup *grp;
+    Octstr *id;
+
+    while (grplist && (grp = gwlist_extract_first(grplist)) != NULL) {
+	id = cfg_get(grp, octstr_imm("id"));
+	if (cfg_get_bool(&tmp_dead, grp, octstr_imm("dead-start")) != -1) {
+		if (tmp_dead) {
+			debug("pluginbox.plugin.init", 0, "Skipping plugin %s", octstr_get_cstr(id));
+			octstr_destroy(id);
+			continue;
+		}
+	}
+	plugin = pluginbox_plugins_add(cfg, id, grp);
+	gw_prioqueue_produce(prioqueue, plugin);
     }
 
     while ((plugin = gw_prioqueue_consume(prioqueue)) != NULL) {
         gwlist_produce(all_plugins, plugin);
 
         if (plugin->direction & PLUGINBOX_MESSAGE_FROM_SMSBOX) {
-            debug("pluginbox.plugin.init", 0, "%s plugin %s to from smsbox process queue", plugin->started ? "Adding" : "Delaying", octstr_get_cstr(plugin->path));
+            debug("pluginbox.plugin.init", 0, "Adding plugin %s to from smsbox process queue", octstr_get_cstr(plugin->path));
             gwlist_produce(smsbox_inbound_plugins, plugin);
         }
         if (plugin->direction & PLUGINBOX_MESSAGE_FROM_BEARERBOX) {
-            debug("pluginbox.plugin.init", 0, "%s plugin %s to from bearerbox process queue", plugin->started ? "Adding" : "Delaying", octstr_get_cstr(plugin->path));
+            debug("pluginbox.plugin.init", 0, "Adding plugin %s to from bearerbox process queue", octstr_get_cstr(plugin->path));
             gwlist_produce(bearerbox_inbound_plugins, plugin);
         }
     }
@@ -259,36 +273,96 @@ static Octstr *nosuchplugin(Octstr *plugin, int status_type)
 	return octstr_format("Plugin with id %s not found.", octstr_get_cstr(plugin));
 }
 
-int pluginbox_stop_plugin(Octstr *plugin)
+int pluginbox_remove_plugin(Octstr *pluginname)
 {
-	return 1;
+	int i;
+	PluginBoxPlugin *plugin;
+
+	for (i = 0; i < gwlist_len(smsbox_inbound_plugins); i++) {
+		plugin = gwlist_get(all_plugins, i);
+		if (octstr_compare(pluginname, plugin->id) == 0) {
+			debug("pluginbox.plugin.remove", 0, "Plugin %s removed from smsbox inbound plugins.", octstr_get_cstr(pluginname));
+			gwlist_delete(smsbox_inbound_plugins, i, 1);
+			break;
+		}
+	}
+	for (i = 0; i < gwlist_len(bearerbox_inbound_plugins); i++) {
+		plugin = gwlist_get(all_plugins, i);
+		if (octstr_compare(pluginname, plugin->id) == 0) {
+			debug("pluginbox.plugin.remove", 0, "Plugin %s removed from bearerbox inbound plugins.", octstr_get_cstr(pluginname));
+			gwlist_delete(bearerbox_inbound_plugins, i, 1);
+			break;
+		}
+	}
+	for (i = 0; i < gwlist_len(all_plugins); i++) {
+		plugin = gwlist_get(all_plugins, i);
+		if (octstr_compare(pluginname, plugin->id) == 0) {
+			pluginbox_plugin_destroy(plugin);
+			gwlist_delete(all_plugins, i, 1);
+			return 1;
+		}
+	}
+        debug("pluginbox.plugin.remove", 0, "Plugin %s not found.", octstr_get_cstr(pluginname));
+	return 0;
 }
 
-int pluginbox_start_plugin(Octstr *plugin)
+int pluginbox_add_plugin(Cfg *cfg, Octstr *pluginname)
 {
-	return 1;
+    List *grplist = cfg_get_multi_group(cfg, octstr_imm("pluginbox-plugin"));
+    PluginBoxPlugin *plugin;
+    CfgGroup *grp;
+    Octstr *id;
+    int found = 0;
+    int i;
+
+    for (i = 0; i < gwlist_len(all_plugins); i++) {
+	plugin = gwlist_get(all_plugins, i);
+	if (octstr_compare(pluginname, plugin->id) == 0) {
+            debug("pluginbox.plugin.add", 0, "Plugin %s already added.", octstr_get_cstr(plugin->id));
+	    return 0;
+	}
+    }
+    gw_prioqueue_t *prioqueue = gw_prioqueue_create((int(*)(const void *, const void *))pluginbox_plugin_compare);
+    while ((plugin = gwlist_consume(all_plugins)) != NULL) {
+	gw_prioqueue_produce(prioqueue, plugin);
+    }
+
+    while (grplist && (grp = gwlist_extract_first(grplist)) != NULL) {
+	id = cfg_get(grp, octstr_imm("id"));
+	if (octstr_compare(id, pluginname) == 0) {
+		plugin = pluginbox_plugins_add(cfg, id, grp);
+		gw_prioqueue_produce(prioqueue, plugin);
+		found = -1;
+	}
+    }
+
+    while ((plugin = gw_prioqueue_consume(prioqueue)) != NULL) {
+        gwlist_produce(all_plugins, plugin);
+
+        if (plugin->direction & PLUGINBOX_MESSAGE_FROM_SMSBOX) {
+            debug("pluginbox.plugin.init", 0, "Adding plugin %s to from smsbox process queue", octstr_get_cstr(plugin->path));
+            gwlist_produce(smsbox_inbound_plugins, plugin);
+        }
+        if (plugin->direction & PLUGINBOX_MESSAGE_FROM_BEARERBOX) {
+            debug("pluginbox.plugin.init", 0, "Adding plugin %s to from bearerbox process queue", octstr_get_cstr(plugin->path));
+            gwlist_produce(bearerbox_inbound_plugins, plugin);
+        }
+    }
+    
+    gwlist_destroy(grplist, NULL);
+    
+    gw_prioqueue_destroy(prioqueue, NULL);
+    return found;
 }
 
-int pluginbox_remove_plugin(Octstr *plugin)
+Octstr *pluginbox_status_plugin(Octstr *pluginname, List *cgivars, int status_type)
 {
-	return 1;
-}
-
-int pluginbox_add_plugin(Octstr *plugin)
-{
-	return 1;
-}
-
-int pluginbox_restart_plugin(Octstr *plugin)
-{
-	return 1;
-}
-
-Octstr *pluginbox_status_plugin(Octstr *plugin, List *cgivars, int status_type)
-{
-	PluginBoxPlugin *plug;
-	if (NULL == (plug = find_plugin(plugin))) {
-		return nosuchplugin(plugin, status_type);
+	PluginBoxPlugin *plugin;
+	if (NULL == (plugin = find_plugin(pluginname))) {
+		return nosuchplugin(pluginname, status_type);
+	}
+	if (NULL != plugin->status) {
+		return plugin->status(plugin, cgivars, status_type);
 	}
 	return octstr_create("dummy");
 }

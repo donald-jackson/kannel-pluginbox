@@ -68,6 +68,7 @@
 #include "gw/shared.h"
 #include "gw/bb.h"
 
+#include "pluginbox.h"
 #include "pluginbox_plugin.h"
 
 /* our config */
@@ -86,6 +87,9 @@ static Octstr *bearerbox_host;
 static int bearerbox_port_ssl = 0;
 
 Octstr *pluginbox_id;
+
+/* our status */
+volatile sig_atomic_t plugin_status;
 
 #define SLEEP_BETWEEN_EMPTY_SELECTS 1.0
 #define DEFAULT_LIMIT_PER_CYCLE 10
@@ -709,6 +713,9 @@ static void init_pluginbox(Cfg *cfg) {
         octstr_destroy(logfile);
     }
 
+    /* http-admin is REQUIRED */
+    httpadmin_start(cfg);
+
     pluginbox_plugins_init(cfg);
 
     pluginbox_status = PLUGIN_RUNNING;
@@ -764,6 +771,7 @@ int main(int argc, char **argv) {
         gwthread_sleep(1.0);
     }
 
+    httpadmin_stop();
     pluginbox_plugin_shutdown();
 
     gwlib_shutdown();
@@ -771,4 +779,52 @@ int main(int argc, char **argv) {
     if (restart_pluginbox)
         execvp(argv[0], argv);
     return 0;
+}
+
+/* http admin functions */
+
+char *plugin_status_linebreak(int status_type)
+{
+    switch (status_type) {
+        case PLUGINSTATUS_HTML:
+            return "<br>\n";
+        case PLUGINSTATUS_WML:
+            return "<br/>\n";
+        case PLUGINSTATUS_TEXT:
+            return "\n";
+        case PLUGINSTATUS_XML:
+            return "\n";
+        default:
+            return NULL;
+    }
+}
+
+Octstr *plugin_print_status(int status_type)
+{
+	return octstr_create("");
+}
+
+int plugin_stop_plugin(Octstr *plugin)
+{
+	return 1;
+}
+
+int plugin_start_plugin(Octstr *plugin)
+{
+	return 1;
+}
+
+int plugin_restart_plugin(Octstr *plugin)
+{
+	return 1;
+}
+
+int plugin_remove_plugin(Octstr *plugin)
+{
+	return 1;
+}
+
+int plugin_add_plugin(Octstr *plugin)
+{
+	return 1;
 }

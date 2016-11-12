@@ -83,4 +83,5 @@ MULTI_GROUP(pluginbox-plugin,
         OCTSTR(events)
         OCTSTR(args)
         OCTSTR(id)
+	OCTSTR(dead-start)
 )

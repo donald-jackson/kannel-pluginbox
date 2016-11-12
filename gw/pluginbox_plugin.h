@@ -86,6 +86,7 @@ extern "C" {
         long direction;
         Cfg *running_configuration;
         Octstr *id;
+	long started;
     };
     
     struct PluginBoxMsg {
@@ -101,6 +102,12 @@ extern "C" {
     int pluginbox_plugins_init(Cfg *cfg);
     void pluginbox_plugin_shutdown();
     void pluginbox_plugins_start(void (*done)(void *context, Msg *msg, int status), void *context, Msg *msg, long type);
+    int pluginbox_stop_plugin(Octstr *plugin);
+    int pluginbox_start_plugin(Octstr *plugin);
+    int pluginbox_remove_plugin(Octstr *plugin);
+    int pluginbox_add_plugin(Octstr *plugin);
+    int pluginbox_restart_plugin(Octstr *plugin);
+    Octstr *pluginbox_status_plugin(Octstr *plugin, List *cgivars, int status_type);
 
 #ifdef __cplusplus
 }

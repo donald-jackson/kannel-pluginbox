@@ -801,17 +801,24 @@ char *plugin_status_linebreak(int status_type)
 
 Octstr *plugin_print_status(int status_type)
 {
-	return octstr_create("");
+	const char *frmt;
+	switch (status_type) {
+	case PLUGINSTATUS_TEXT:
+	default:
+		frmt = "%s\n";
+		break;
+	}
+	return octstr_format(frmt, "status");
 }
 
 int plugin_stop_plugin(Octstr *plugin)
 {
-	return 1;
+	return pluginbox_stop_plugin(plugin);
 }
 
 int plugin_start_plugin(Octstr *plugin)
 {
-	return 1;
+	return pluginbox_start_plugin(plugin);
 }
 
 int plugin_restart_plugin(Octstr *plugin)
@@ -821,10 +828,15 @@ int plugin_restart_plugin(Octstr *plugin)
 
 int plugin_remove_plugin(Octstr *plugin)
 {
-	return 1;
+	return pluginbox_remove_plugin(plugin);
 }
 
 int plugin_add_plugin(Octstr *plugin)
 {
-	return 1;
+	return pluginbox_add_plugin(plugin);
+}
+
+Octstr *plugin_status_plugin(Octstr *plugin, List *cgivars, int status_type)
+{
+	return pluginbox_status_plugin(plugin, cgivars, status_type);
 }

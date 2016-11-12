@@ -94,6 +94,7 @@ PluginBoxPlugin *pluginbox_plugin_create() {
     pluginbox_plugin->args = NULL;
     pluginbox_plugin->shutdown = NULL;
     pluginbox_plugin->id = NULL;
+    pluginbox_plugin->started = 0;
     return pluginbox_plugin;
 }
 
@@ -130,7 +131,7 @@ void pluginbox_plugins_next(PluginBoxMsg *pluginbox_msg) {
         if(pluginbox_msg->chain < len) {
             /* We're OK */
             PluginBoxPlugin *plugin = gwlist_get(target, pluginbox_msg->chain);
-            if(plugin != NULL) {
+            if(plugin != NULL && plugin->started != 0) {
                 ++pluginbox_msg->chain;
                 plugin->process(plugin, pluginbox_msg);
                 return;
@@ -176,6 +177,9 @@ int pluginbox_plugins_init(Cfg *cfg) {
         plugin->priority = tmp_long;
         plugin->running_configuration = cfg;
         plugin->id = cfg_get(grp, octstr_imm("id"));
+	if (cfg_get_integer(&(plugin->started), grp, octstr_imm("dead-start")) == -1) {
+		plugin->started = 1;
+	}
 
         if (!octstr_len(plugin->path)) {
             panic(0, "No 'path' specified for pluginbox-plugin group");
@@ -195,11 +199,13 @@ int pluginbox_plugins_init(Cfg *cfg) {
                 panic(0, "init-function %s unable to load from %s", octstr_get_cstr(tmp_str), octstr_get_cstr(plugin->path));
             }
             plugin->args = cfg_get(grp, octstr_imm("args"));
-            if (!plugin->init(plugin)) {
-                panic(0, "Plugin %s initialization failed", octstr_get_cstr(plugin->path));
-            } else {
-                info(0, "Plugin %s initialized priority %ld", octstr_get_cstr(plugin->path), plugin->priority);
-                gw_prioqueue_produce(prioqueue, plugin);
+	    if (plugin->started) {
+            	if (!plugin->init(plugin)) {
+                	panic(0, "Plugin %s initialization failed", octstr_get_cstr(plugin->path));
+            	} else {
+                	info(0, "Plugin %s initialized priority %ld", octstr_get_cstr(plugin->path), plugin->priority);
+                	gw_prioqueue_produce(prioqueue, plugin);
+		}
             }
         } else {
             panic(0, "No initialization 'init' function specified, cannot continue (%s)", octstr_get_cstr(plugin->path));
@@ -211,11 +217,11 @@ int pluginbox_plugins_init(Cfg *cfg) {
         gwlist_produce(all_plugins, plugin);
 
         if (plugin->direction & PLUGINBOX_MESSAGE_FROM_SMSBOX) {
-            debug("pluginbox.plugin.init", 0, "Adding plugin %s to from smsbox process queue", octstr_get_cstr(plugin->path));
+            debug("pluginbox.plugin.init", 0, "%s plugin %s to from smsbox process queue", plugin->started ? "Adding" : "Delaying", octstr_get_cstr(plugin->path));
             gwlist_produce(smsbox_inbound_plugins, plugin);
         }
         if (plugin->direction & PLUGINBOX_MESSAGE_FROM_BEARERBOX) {
-            debug("pluginbox.plugin.init", 0, "Adding plugin %s to from bearerbox process queue", octstr_get_cstr(plugin->path));
+            debug("pluginbox.plugin.init", 0, "%s plugin %s to from bearerbox process queue", plugin->started ? "Adding" : "Delaying", octstr_get_cstr(plugin->path));
             gwlist_produce(bearerbox_inbound_plugins, plugin);
         }
     }
@@ -230,4 +236,59 @@ void pluginbox_plugin_shutdown() {
     gwlist_destroy(bearerbox_inbound_plugins, NULL);
     
     gwlist_destroy(all_plugins, (void (*)(void *))pluginbox_plugin_destroy);
+}
+
+/* http admin functions */
+
+static PluginBoxPlugin *find_plugin(Octstr *plugin)
+{
+	int i;
+	PluginBoxPlugin *res;
+
+	for (i = 0; i < gwlist_len(all_plugins); i++) {
+		res = gwlist_get(all_plugins, i);
+		if (NULL != res && octstr_compare(plugin, res->id) == 0) {
+			return res;
+		}
+	}
+	return NULL;
+}
+
+static Octstr *nosuchplugin(Octstr *plugin, int status_type)
+{
+	return octstr_format("Plugin with id %s not found.", octstr_get_cstr(plugin));
+}
+
+int pluginbox_stop_plugin(Octstr *plugin)
+{
+	return 1;
+}
+
+int pluginbox_start_plugin(Octstr *plugin)
+{
+	return 1;
+}
+
+int pluginbox_remove_plugin(Octstr *plugin)
+{
+	return 1;
+}
+
+int pluginbox_add_plugin(Octstr *plugin)
+{
+	return 1;
+}
+
+int pluginbox_restart_plugin(Octstr *plugin)
+{
+	return 1;
+}
+
+Octstr *pluginbox_status_plugin(Octstr *plugin, List *cgivars, int status_type)
+{
+	PluginBoxPlugin *plug;
+	if (NULL == (plug = find_plugin(plugin))) {
+		return nosuchplugin(plugin, status_type);
+	}
+	return octstr_create("dummy");
 }

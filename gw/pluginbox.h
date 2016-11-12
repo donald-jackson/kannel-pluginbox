@@ -92,6 +92,7 @@ int plugin_start_plugin(Octstr *plugin);
 int plugin_remove_plugin(Octstr *plugin);
 int plugin_add_plugin(Octstr *plugin);
 int plugin_restart_plugin(Octstr *plugin);
+Octstr *plugin_status_plugin(Octstr *plugin, List *cgivars, int status_type);
 
 /*----------------------------------------------------------------
  * common function to all (in pluginbox.c)

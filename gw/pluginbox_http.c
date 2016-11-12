@@ -164,9 +164,9 @@ static Octstr *httpd_stop_plugin(List *cgivars, int status_type)
         if (plugin_stop_plugin(plugin) == -1)
             return octstr_format("Could not shut down plugin-id `%s'", octstr_get_cstr(plugin));
         else
-            return octstr_format("SMSC `%s' shut down", octstr_get_cstr(plugin));
+            return octstr_format("PLUGIN `%s' shut down", octstr_get_cstr(plugin));
     } else
-        return octstr_create("SMSC id not given");
+        return octstr_create("PLUGIN id not given");
 }
 
 static Octstr *httpd_remove_plugin(List *cgivars, int status_type)
@@ -182,9 +182,26 @@ static Octstr *httpd_remove_plugin(List *cgivars, int status_type)
         if (plugin_remove_plugin(plugin) == -1)
             return octstr_format("Could not remove plugin-id `%s'", octstr_get_cstr(plugin));
         else
-            return octstr_format("SMSC `%s' removed", octstr_get_cstr(plugin));
+            return octstr_format("PLUGIN `%s' removed", octstr_get_cstr(plugin));
     } else
-        return octstr_create("SMSC id not given");
+        return octstr_create("PLUGIN id not given");
+}
+
+
+static Octstr *httpd_status_plugin(List *cgivars, int status_type)
+{
+    Octstr *reply;
+    Octstr *plugin;
+    if ((reply = httpd_check_authorization(cgivars, 0))!= NULL) return reply;
+    if ((reply = httpd_check_status())!= NULL) return reply;
+
+    /* check if the plugin id is given */
+    plugin = http_cgi_variable(cgivars, "plugin");
+    if (plugin) {
+        return plugin_status_plugin(plugin, cgivars, status_type);
+    } else {
+        return octstr_create("PLUGIN id not given");
+    }
 }
 
 static Octstr *httpd_add_plugin(List *cgivars, int status_type)
@@ -200,9 +217,9 @@ static Octstr *httpd_add_plugin(List *cgivars, int status_type)
         if (plugin_add_plugin(plugin) == -1)
             return octstr_format("Could not add plugin-id `%s'", octstr_get_cstr(plugin));
         else
-            return octstr_format("SMSC `%s' added", octstr_get_cstr(plugin));
+            return octstr_format("PLUGIN `%s' added", octstr_get_cstr(plugin));
     } else
-        return octstr_create("SMSC id not given");
+        return octstr_create("PLUGIN id not given");
 }
 
 static Octstr *httpd_start_plugin(List *cgivars, int status_type)
@@ -218,9 +235,9 @@ static Octstr *httpd_start_plugin(List *cgivars, int status_type)
         if (plugin_start_plugin(plugin) == -1)
             return octstr_format("Could not re-start plugin-id `%s'", octstr_get_cstr(plugin));
         else
-            return octstr_format("SMSC `%s' re-started", octstr_get_cstr(plugin));
+            return octstr_format("PLUGIN `%s' re-started", octstr_get_cstr(plugin));
     } else
-        return octstr_create("SMSC id not given");
+        return octstr_create("PLUGIN id not given");
 }
 
 static Octstr *httpd_restart_plugin(List *cgivars, int status_type)
@@ -236,9 +253,9 @@ static Octstr *httpd_restart_plugin(List *cgivars, int status_type)
         if (plugin_restart_plugin(plugin) == -1)
             return octstr_format("Could not re-start plugin-id `%s'", octstr_get_cstr(plugin));
         else
-            return octstr_format("SMSC `%s' re-started", octstr_get_cstr(plugin));
+            return octstr_format("PLUGIN `%s' re-started", octstr_get_cstr(plugin));
     } else
-        return octstr_create("SMSC id not given");
+        return octstr_create("PLUGIN id not given");
 }
 
 /* Known httpd commands and their functions */
@@ -253,6 +270,7 @@ static struct httpd_command {
     { "restart-plugin", httpd_restart_plugin },
     { "add-plugin", httpd_add_plugin },
     { "remove-plugin", httpd_remove_plugin },
+    { "status-plugin", httpd_status_plugin },
     { NULL , NULL } /* terminate list */
 };
 

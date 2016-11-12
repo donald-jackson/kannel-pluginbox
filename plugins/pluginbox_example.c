@@ -76,7 +76,15 @@ void pluginbox_example_process(PluginBoxPlugin *pluginbox_plugin, PluginBoxMsg *
 
 Octstr *pluginbox_example_status(PluginBoxPlugin *pluginbox_plugin, List *cgivars, int status_type)
 {
-    return octstr_create("Status of example plugin.\n");
+    Octstr *res;
+    switch (status_type) {
+        case PLUGINSTATUS_HTML:
+        case PLUGINSTATUS_WML:
+        case PLUGINSTATUS_TEXT:
+        case PLUGINSTATUS_XML:
+        default:
+    		return octstr_format("Status of example plugin. Our id = %s.\n", octstr_get_cstr(pluginbox_plugin->id));
+    }
 }
 
 int pluginbox_example_init(PluginBoxPlugin *pluginbox_plugin) {

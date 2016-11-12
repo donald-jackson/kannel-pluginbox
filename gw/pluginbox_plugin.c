@@ -374,6 +374,45 @@ int pluginbox_add_plugin(Cfg *cfg, Octstr *pluginname)
     return found;
 }
 
+Octstr *pluginbox_get_status(List *cgivars, int status_type)
+{
+    const char *fmt1, *fmt2;
+    Octstr *res, *final;
+    int i;
+    PluginBoxPlugin *plugin;
+
+    switch (status_type) {
+        case PLUGINSTATUS_HTML:
+            fmt1 = "<table>\n<tr><th>id</td><th>path</th><th>args</th></tr>\n%s</table>";
+	    fmt2 = "<tr><td>%s</td><td>%s</td><td>%s</td></tr>\n";
+	    break;
+        case PLUGINSTATUS_WML:
+	    // Todo. Who uses wap?
+            fmt1 = "%s";
+	    fmt2 = "%s%s%s";
+	    break;
+        case PLUGINSTATUS_XML:
+            fmt1 = "<plugins>\n%s</plugins>";
+	    fmt2 = "<plugin>\n    <id>%s</id>\n    <path>%s</path>\n    <args>%s</args>\n</plugin>\n";
+	    break;
+        case PLUGINSTATUS_TEXT:
+	default:
+            fmt1 = "Loaded plugins:\n\n%s";
+	    fmt2 = "Plugin: %s.\nPath  : %s.\nArgs  : %s.\n\n";
+	    break;
+    }
+    gw_rwlock_rdlock(configurationlock);
+    res = octstr_create("");
+    for (i = 0; i < gwlist_len(all_plugins); i++) {
+	plugin = gwlist_get(all_plugins, i);
+	octstr_format_append(res, fmt2, octstr_get_cstr(plugin->id), octstr_get_cstr(plugin->path), octstr_get_cstr(plugin->args));
+    }
+    gw_rwlock_unlock(configurationlock);
+    final = octstr_format(fmt1, octstr_get_cstr(res));
+    octstr_destroy(res);
+    return final;
+}
+
 Octstr *pluginbox_status_plugin(Octstr *pluginname, List *cgivars, int status_type)
 {
 	PluginBoxPlugin *plugin;

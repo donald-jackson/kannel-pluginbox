@@ -184,76 +184,25 @@ void pluginbox_cdr_process(PluginBoxPlugin *pluginbox_plugin, PluginBoxMsg *plug
     pluginbox_msg->callback(pluginbox_msg);
 }
 
-#if 0
-int pluginbox_cdr_configure(PluginCdr *plugin_cdr) {
-    Octstr *tmp_str;
-    long tmp_long;
-    PluginBoxPlugin *pluginbox_plugin = plugin_http->plugin;
-
-    if(!octstr_len(pluginbox_plugin->id)) {
-        error(0, PLUGINBOX_LOG_PREFIX "An 'id' parameter must be specified in the pluginbox-plugin group for HTTP plugins");
-        return 0;
-    }
-
-    Cfg *cfg = cfg_create(pluginbox_plugin->args);
-
-    if(cfg_read(cfg) == -1) {
-        error(0, PLUGINBOX_LOG_PREFIX "Couldn't load HTTP plugin %s configuration", octstr_get_cstr(pluginbox_plugin->id));
-        cfg_destroy(cfg);
-        return 0;
-    }
-
-    List *grplist = cfg_get_multi_group(cfg, octstr_imm("pluginbox-http"));
-    CfgGroup *grp;
-    Octstr *config_id;
-    while (grplist && (grp = gwlist_extract_first(grplist)) != NULL) {
-        config_id = cfg_get(grp, octstr_imm("id"));
-
-        if(octstr_len(config_id) && (octstr_compare(config_id, pluginbox_plugin->id) == 0)) {
-            octstr_destroy(config_id);
-            goto found;
-        }
-        octstr_destroy(config_id);
-    }
-
-    gwlist_destroy(grplist, NULL);
-
-    goto error;
-
-found:
-    info(0, PLUGINBOX_LOG_PREFIX "Loading configuration for %s", octstr_get_cstr(pluginbox_plugin->id));
-
-    plugin_http->url = cfg_get(grp, octstr_imm("url"));
-
-    if(!octstr_len(plugin_http->url)) {
-        error(0, PLUGINBOX_LOG_PREFIX "No 'url' specified in 'pluginbox-http' group id %s", octstr_get_cstr(pluginbox_plugin->id));
-        return 0;
-    }
-
-    if(cfg_get_integer(&tmp_long,grp, octstr_imm("max-pending-requests")) == -1) {
-        tmp_long = PLUGINBOX_HTTP_DEFAULT_MAX_PENDING;
-    }
-
-    info(0, PLUGINBOX_LOG_PREFIX "Max pending requests set to %ld", tmp_long);
-
-    plugin_http->max_pending_requests = semaphore_create(tmp_long);
-
-    gwlist_destroy(grplist, NULL);
-
-    cfg_destroy(cfg);
-
-
-    return 1;
-error:
-    error(0, PLUGINBOX_LOG_PREFIX "No matching 'pluginbox-http' group found for id %s, cannot initialize", octstr_get_cstr(pluginbox_plugin->id));
-    cfg_destroy(cfg);
-    return 0;
-}
-#endif
-
 Octstr *pluginbox_cdr_status(PluginBoxPlugin *pluginbox_plugin, List *cgivars, int status_type)
 {
-	return octstr_create("cdr status\n");
+	const char *fmt;
+	PluginCdr *plugin_cdr = (PluginCdr *)pluginbox_plugin->context;
+
+	switch (status_type) {
+	case PLUGINSTATUS_HTML:
+	case PLUGINSTATUS_WML:
+		fmt = "Configuration:<br/>\n<br/>\nSave MO: %d.<br/>\nSave MT: %d.<br/>\nSave DLR: %d.<br/>\n";
+		break;
+	case PLUGINSTATUS_XML:
+		fmt = "<plugin-cdr>\n    <save-mo>%d</save-mo>\n    <save-mt>%d</save-mt>\n    <save-dlr>%d</save-dlr>\n</plugin-cdr>\n";
+		break;
+	case PLUGINSTATUS_TEXT:
+	default:
+		fmt = "Configuration:\n\nSave MO: %d.\nSave MT: %d.\nSave DLR: %d.\n";
+		break;
+	}
+	return octstr_format(fmt, plugin_cdr->save_mo, plugin_cdr->save_mt, plugin_cdr->save_dlr);
 }
 
 int pluginbox_cdr_init(PluginBoxPlugin *pluginbox_plugin) {

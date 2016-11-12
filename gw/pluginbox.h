@@ -78,15 +78,7 @@ enum {
     PLUGIN_FULL = 5         /* message queue too long, do not accept new messages */
 };
 
-/* type of output given by various status functions */
-enum {
-    PLUGINSTATUS_HTML = 0,
-    PLUGINSTATUS_TEXT = 1,
-    PLUGINSTATUS_WML = 2,
-    PLUGINSTATUS_XML = 3
-};
-
-Octstr *plugin_print_status(int status_type);
+Octstr *plugin_print_status(List *cgivars, int status_type);
 int plugin_remove_plugin(Octstr *plugin);
 int plugin_add_plugin(Octstr *plugin);
 int plugin_restart_plugin(Octstr *plugin);

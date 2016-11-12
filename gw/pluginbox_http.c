@@ -70,6 +70,7 @@
 
 #include "gwlib/gwlib.h"
 #include "pluginbox.h"
+#include "pluginbox_plugin.h"
 
 extern volatile sig_atomic_t plugin_status;
 
@@ -109,7 +110,7 @@ denied:
     gwthread_sleep(sleep);
     sleep += 1.0;		/* little protection against brute force
 				 * password cracking */
-    return octstr_create("Denied");
+    return octstr_create("Denied.");
 }
 
 /*
@@ -127,7 +128,7 @@ static Octstr *httpd_status(List *cgivars, int status_type)
 {
     Octstr *reply;
     if ((reply = httpd_check_authorization(cgivars, 1))!= NULL) return reply;
-    return plugin_print_status(status_type);
+    return plugin_print_status(cgivars, status_type);
 }
 
 static Octstr *httpd_loglevel(List *cgivars, int status_type)
@@ -162,11 +163,11 @@ static Octstr *httpd_remove_plugin(List *cgivars, int status_type)
     plugin = http_cgi_variable(cgivars, "plugin");
     if (plugin) {
         if (plugin_remove_plugin(plugin) == -1)
-            return octstr_format("Could not remove plugin-id `%s'", octstr_get_cstr(plugin));
+            return octstr_format("Could not remove plugin-id `%s'. See logs.", octstr_get_cstr(plugin));
         else
-            return octstr_format("PLUGIN `%s' removed", octstr_get_cstr(plugin));
+            return octstr_format("PLUGIN `%s' removed.", octstr_get_cstr(plugin));
     } else
-        return octstr_create("PLUGIN id not given");
+        return octstr_create("PLUGIN id not given.");
 }
 
 
@@ -182,7 +183,7 @@ static Octstr *httpd_status_plugin(List *cgivars, int status_type)
     if (plugin) {
         return plugin_status_plugin(plugin, cgivars, status_type);
     } else {
-        return octstr_create("PLUGIN id not given");
+        return octstr_create("PLUGIN id not given.");
     }
 }
 
@@ -197,11 +198,11 @@ static Octstr *httpd_add_plugin(List *cgivars, int status_type)
     plugin = http_cgi_variable(cgivars, "plugin");
     if (plugin) {
         if (plugin_add_plugin(plugin) == 0)
-            return octstr_format("Could not add plugin-id `%s'", octstr_get_cstr(plugin));
+            return octstr_format("Could not add plugin-id `%s'. See logs.", octstr_get_cstr(plugin));
         else
-            return octstr_format("PLUGIN `%s' added", octstr_get_cstr(plugin));
+            return octstr_format("PLUGIN `%s' added.", octstr_get_cstr(plugin));
     } else
-        return octstr_create("PLUGIN id not given");
+        return octstr_create("PLUGIN id not given.");
 }
 
 static Octstr *httpd_restart_plugin(List *cgivars, int status_type)
@@ -215,11 +216,11 @@ static Octstr *httpd_restart_plugin(List *cgivars, int status_type)
     plugin = http_cgi_variable(cgivars, "plugin");
     if (plugin) {
         if (plugin_restart_plugin(plugin) == -1)
-            return octstr_format("Could not re-start plugin-id `%s'", octstr_get_cstr(plugin));
+            return octstr_format("Could not re-start plugin-id `%s'. See logs.", octstr_get_cstr(plugin));
         else
-            return octstr_format("PLUGIN `%s' re-started", octstr_get_cstr(plugin));
+            return octstr_format("PLUGIN `%s' re-started.", octstr_get_cstr(plugin));
     } else
-        return octstr_create("PLUGIN id not given");
+        return octstr_create("PLUGIN id not given.");
 }
 
 /* Known httpd commands and their functions */
@@ -312,7 +313,7 @@ static void httpd_serve(HTTPClient *client, Octstr *ourl, List *headers,
 
     if (status_type == PLUGINSTATUS_HTML) {
 	header = "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 3.2//EN\">\n"
- 	    "<html>\n<title>" GW_NAME "</title>\n<body>\n<p>";
+ 	    "<html>\n<title>" GW_NAME " PluginBox</title>\n<body>\n<p>";
 	footer = "</p>\n</body></html>\n";
 	content_type = "text/html";
     } else if (status_type == PLUGINSTATUS_WML) {
@@ -324,8 +325,8 @@ static void httpd_serve(HTTPClient *client, Octstr *ourl, List *headers,
 	content_type = "text/vnd.wap.wml";
     } else if (status_type == PLUGINSTATUS_XML) {
 	header = "<?xml version=\"1.0\"?>\n"
-            "<gateway>\n";
-        footer = "</gateway>\n";
+            "<pluginbox>\n";
+        footer = "</pluginbox>\n";
     } else {
 	header = "";
 	footer = "";

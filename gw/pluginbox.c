@@ -799,16 +799,9 @@ char *plugin_status_linebreak(int status_type)
     }
 }
 
-Octstr *plugin_print_status(int status_type)
+Octstr *plugin_print_status(List *cgivars, int status_type)
 {
-	const char *frmt;
-	switch (status_type) {
-	case PLUGINSTATUS_TEXT:
-	default:
-		frmt = "%s\n";
-		break;
-	}
-	return octstr_format(frmt, "status");
+	pluginbox_get_status(cgivars, status_type);
 }
 
 int plugin_remove_plugin(Octstr *plugin)

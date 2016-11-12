@@ -180,30 +180,40 @@ static PluginBoxPlugin *pluginbox_plugins_add(Cfg *cfg, Octstr *id, CfgGroup *gr
         plugin->running_configuration = cfg;
 
         if (!octstr_len(plugin->path)) {
-            panic(0, "No 'path' specified for pluginbox-plugin group");
+            error(0, "No 'path' specified for pluginbox-plugin group");
+	    pluginbox_plugin_destroy(plugin);
+	    return NULL;
         }
 
         lib = dlopen(octstr_get_cstr(plugin->path), RTLD_NOW | RTLD_GLOBAL);
 
         if (!lib) {
             error_str = dlerror();
-            panic(0, "Error opening plugin '%s' (%s)", octstr_get_cstr(plugin->path), error_str);
+            error(0, "Error opening plugin '%s' (%s)", octstr_get_cstr(plugin->path), error_str);
+	    pluginbox_plugin_destroy(plugin);
+	    return NULL;
         }
 
         tmp_str = cfg_get(grp, octstr_imm("init"));
         if (octstr_len(tmp_str)) {
             plugin->init = dlsym(lib, octstr_get_cstr(tmp_str));
             if (!plugin->init) {
-                panic(0, "init-function %s unable to load from %s", octstr_get_cstr(tmp_str), octstr_get_cstr(plugin->path));
+                error(0, "init-function %s unable to load from %s", octstr_get_cstr(tmp_str), octstr_get_cstr(plugin->path));
+		pluginbox_plugin_destroy(plugin);
+		return NULL;
             }
             plugin->args = cfg_get(grp, octstr_imm("args"));
             if (!plugin->init(plugin)) {
-               	panic(0, "Plugin %s initialization failed", octstr_get_cstr(plugin->path));
+               	error(0, "Plugin %s initialization failed", octstr_get_cstr(plugin->path));
+		pluginbox_plugin_destroy(plugin);
+		return NULL;
             } else {
                	info(0, "Plugin %s initialized priority %ld", octstr_get_cstr(plugin->path), plugin->priority);
             }
         } else {
-            panic(0, "No initialization 'init' function specified, cannot continue (%s)", octstr_get_cstr(plugin->path));
+            error(0, "No initialization 'init' function specified, cannot continue (%s)", octstr_get_cstr(plugin->path));
+	    pluginbox_plugin_destroy(plugin);
+	    return NULL;
         }
         octstr_destroy(tmp_str);
 	return plugin;
@@ -234,7 +244,9 @@ int pluginbox_plugins_init(Cfg *cfg) {
 		}
 	}
 	plugin = pluginbox_plugins_add(cfg, id, grp);
-	gw_prioqueue_produce(prioqueue, plugin);
+	if (NULL != plugin) {
+		gw_prioqueue_produce(prioqueue, plugin);
+	}
     }
 
     while ((plugin = gw_prioqueue_consume(prioqueue)) != NULL) {
@@ -349,8 +361,11 @@ int pluginbox_add_plugin(Cfg *cfg, Octstr *pluginname)
 	id = cfg_get(grp, octstr_imm("id"));
 	if (octstr_compare(id, pluginname) == 0) {
 		plugin = pluginbox_plugins_add(cfg, id, grp);
-		gw_prioqueue_produce(prioqueue, plugin);
-		found = -1;
+		if (NULL != plugin) {
+			gw_prioqueue_produce(prioqueue, plugin);
+			found = -1;
+			break;
+		}
 	}
     }
 

@@ -368,16 +368,19 @@ int pluginbox_add_plugin(Cfg *cfg, Octstr *pluginname)
 		}
 	}
     }
+    if (0 == found) {
+            debug("pluginbox.plugin.add", 0, "Plugin %s not found in configuration file.", octstr_get_cstr(pluginname));
+    }
 
     while ((plugin = gw_prioqueue_consume(prioqueue)) != NULL) {
         gwlist_produce(all_plugins, plugin);
 
         if (plugin->direction & PLUGINBOX_MESSAGE_FROM_SMSBOX) {
-            debug("pluginbox.plugin.init", 0, "Adding plugin %s to from smsbox process queue", octstr_get_cstr(plugin->path));
+            debug("pluginbox.plugin.add", 0, "Adding plugin %s to from smsbox process queue", octstr_get_cstr(plugin->path));
             gwlist_produce(smsbox_inbound_plugins, plugin);
         }
         if (plugin->direction & PLUGINBOX_MESSAGE_FROM_BEARERBOX) {
-            debug("pluginbox.plugin.init", 0, "Adding plugin %s to from bearerbox process queue", octstr_get_cstr(plugin->path));
+            debug("pluginbox.plugin.add", 0, "Adding plugin %s to from bearerbox process queue", octstr_get_cstr(plugin->path));
             gwlist_produce(bearerbox_inbound_plugins, plugin);
         }
     }

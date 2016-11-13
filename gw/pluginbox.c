@@ -825,8 +825,6 @@ int plugin_add_plugin(Octstr *plugin)
 
 int plugin_restart_plugin(Octstr *plugin)
 {
-	int dummy;
-	dummy = plugin_remove_plugin(plugin);
 	return plugin_add_plugin(plugin);
 }
 

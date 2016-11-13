@@ -305,7 +305,7 @@ int pluginbox_remove_plugin(Octstr *pluginname)
 
 	gw_rwlock_wrlock(configurationlock);
 	for (i = 0; i < gwlist_len(smsbox_inbound_plugins); i++) {
-		plugin = gwlist_get(all_plugins, i);
+		plugin = gwlist_get(smsbox_inbound_plugins, i);
 		if (octstr_compare(pluginname, plugin->id) == 0) {
 			debug("pluginbox.plugin.remove", 0, "Plugin %s removed from smsbox inbound plugins.", octstr_get_cstr(pluginname));
 			gwlist_delete(smsbox_inbound_plugins, i, 1);
@@ -313,7 +313,7 @@ int pluginbox_remove_plugin(Octstr *pluginname)
 		}
 	}
 	for (i = 0; i < gwlist_len(bearerbox_inbound_plugins); i++) {
-		plugin = gwlist_get(all_plugins, i);
+		plugin = gwlist_get(bearerbox_inbound_plugins, i);
 		if (octstr_compare(pluginname, plugin->id) == 0) {
 			debug("pluginbox.plugin.remove", 0, "Plugin %s removed from bearerbox inbound plugins.", octstr_get_cstr(pluginname));
 			gwlist_delete(bearerbox_inbound_plugins, i, 1);

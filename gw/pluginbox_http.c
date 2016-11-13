@@ -215,7 +215,7 @@ static Octstr *httpd_restart_plugin(List *cgivars, int status_type)
     /* check if the plugin id is given */
     plugin = http_cgi_variable(cgivars, "plugin");
     if (plugin) {
-        if (plugin_restart_plugin(plugin) == -1)
+        if (plugin_restart_plugin(plugin) == 0)
             return octstr_format("Could not re-start plugin-id `%s'. See logs.", octstr_get_cstr(plugin));
         else
             return octstr_format("PLUGIN `%s' re-started.", octstr_get_cstr(plugin));

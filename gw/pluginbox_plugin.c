@@ -402,28 +402,28 @@ Octstr *pluginbox_get_status(List *cgivars, int status_type)
     switch (status_type) {
         case PLUGINSTATUS_HTML:
             fmt1 = "<table>\n<tr><th>id</td><th>path</th><th>args</th></tr>\n%s</table>";
-	    fmt2 = "<tr><td>%s</td><td>%s</td><td>%s</td></tr>\n";
+	    fmt2 = "<tr><td>%ld</td><td>%s</td><td>%s</td><td>%s</td></tr>\n";
 	    break;
         case PLUGINSTATUS_WML:
 	    // Todo. Who uses wap?
             fmt1 = "%s";
-	    fmt2 = "%s%s%s";
+	    fmt2 = "%ld %s %s %s ";
 	    break;
         case PLUGINSTATUS_XML:
             fmt1 = "<plugins>\n%s</plugins>";
-	    fmt2 = "<plugin>\n    <id>%s</id>\n    <path>%s</path>\n    <args>%s</args>\n</plugin>\n";
+	    fmt2 = "<plugin>\n    <priority>%ld</priority>\n    <id>%s</id>\n    <path>%s</path>\n    <args>%s</args>\n</plugin>\n";
 	    break;
         case PLUGINSTATUS_TEXT:
 	default:
             fmt1 = "Loaded plugins:\n\n%s";
-	    fmt2 = "Plugin: %s.\nPath  : %s.\nArgs  : %s.\n\n";
+	    fmt2 = "Priority: %ld.\nPlugin: %s.\nPath  : %s.\nArgs  : %s.\n\n";
 	    break;
     }
     gw_rwlock_rdlock(configurationlock);
     res = octstr_create("");
     for (i = 0; i < gwlist_len(all_plugins); i++) {
 	plugin = gwlist_get(all_plugins, i);
-	octstr_format_append(res, fmt2, octstr_get_cstr(plugin->id), octstr_get_cstr(plugin->path), octstr_get_cstr(plugin->args));
+	octstr_format_append(res, fmt2, plugin->priority, octstr_get_cstr(plugin->id), octstr_get_cstr(plugin->path), octstr_get_cstr(plugin->args));
     }
     gw_rwlock_unlock(configurationlock);
     final = octstr_format(fmt1, octstr_get_cstr(res));

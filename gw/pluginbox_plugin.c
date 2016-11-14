@@ -372,6 +372,12 @@ int pluginbox_add_plugin(Cfg *cfg, Octstr *pluginname)
             debug("pluginbox.plugin.add", 0, "Plugin %s not found in configuration file.", octstr_get_cstr(pluginname));
     }
 
+    /* re-initialize lists */
+    gwlist_destroy(smsbox_inbound_plugins, NULL);
+    smsbox_inbound_plugins = gwlist_create();
+    gwlist_destroy(bearerbox_inbound_plugins, NULL);
+    bearerbox_inbound_plugins = gwlist_create();
+
     while ((plugin = gw_prioqueue_consume(prioqueue)) != NULL) {
         gwlist_produce(all_plugins, plugin);
 

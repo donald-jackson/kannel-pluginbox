@@ -123,6 +123,7 @@ void pluginbox_plugins_done(PluginBoxMsg *pluginbox_msg) {
 */
 void pluginbox_plugins_next(PluginBoxMsg *pluginbox_msg) {
     List *target = NULL;
+    gw_rwlock_rdlock(configurationlock);
     if (pluginbox_msg->type & PLUGINBOX_MESSAGE_FROM_SMSBOX) {
         target = smsbox_inbound_plugins;
     }
@@ -130,7 +131,6 @@ void pluginbox_plugins_next(PluginBoxMsg *pluginbox_msg) {
         target = bearerbox_inbound_plugins;
     }
     
-    gw_rwlock_rdlock(configurationlock);
     if((target != NULL) && (pluginbox_msg->status != PLUGINBOX_MESSAGE_REJECT)) {
         long len = gwlist_len(target);
         if(pluginbox_msg->chain < len) {

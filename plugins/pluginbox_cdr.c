@@ -187,8 +187,22 @@ void pluginbox_cdr_process(PluginBoxPlugin *pluginbox_plugin, PluginBoxMsg *plug
 Octstr *pluginbox_cdr_status(PluginBoxPlugin *pluginbox_plugin, List *cgivars, int status_type)
 {
 	const char *fmt;
+	Octstr *value;
+	int intvalue;
 	PluginCdr *plugin_cdr = (PluginCdr *)pluginbox_plugin->context;
 
+	value = http_cgi_variable(cgivars, "save-mo");
+	if (value) {
+		plugin_cdr->save_mo = atoi(octstr_get_cstr(value)) ? 1 : 0;
+	}
+	value = http_cgi_variable(cgivars, "save-mt");
+	if (value) {
+		plugin_cdr->save_mt = atoi(octstr_get_cstr(value)) ? 1 : 0;
+	}
+	value = http_cgi_variable(cgivars, "save-dlr");
+	if (value) {
+		plugin_cdr->save_dlr = atoi(octstr_get_cstr(value)) ? 1 : 0;
+	}
 	switch (status_type) {
 	case PLUGINSTATUS_HTML:
 	case PLUGINSTATUS_WML:

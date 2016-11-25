@@ -9,8 +9,8 @@ log-level = 0
 #ssl-server-cert-file = ""
 #ssl-server-key-file = ""
 #ssl-trusted-ca-file = ""
-
-
+admin-port=13050
+admin-password=pluginpw
 
 ## Example group for configuring an HTTP plugin
 #group=pluginbox-plugin
@@ -20,4 +20,8 @@ log-level = 0
 #args="/opt/kannel/kannel-pluginbox/contrib/pluginbox_http/pluginbox_http.conf"
 #id=http1
 
-
+group=pluginbox-plugin
+path=plugins/pluginbox_example.so
+priority=1
+id=example1
+init="pluginbox_example_init"

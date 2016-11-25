@@ -68,9 +68,11 @@
 #include "gw/shared.h"
 #include "gw/bb.h"
 
+#include "pluginbox.h"
 #include "pluginbox_plugin.h"
 
 /* our config */
+static Octstr *cfg_filename = NULL;
 static Cfg *cfg;
 /* have we received restart cmd from bearerbox? */
 
@@ -86,6 +88,9 @@ static Octstr *bearerbox_host;
 static int bearerbox_port_ssl = 0;
 
 Octstr *pluginbox_id;
+
+/* our status */
+volatile sig_atomic_t plugin_status;
 
 #define SLEEP_BETWEEN_EMPTY_SELECTS 1.0
 #define DEFAULT_LIMIT_PER_CYCLE 10
@@ -709,6 +714,9 @@ static void init_pluginbox(Cfg *cfg) {
         octstr_destroy(logfile);
     }
 
+    /* http-admin is REQUIRED */
+    httpadmin_start(cfg);
+
     pluginbox_plugins_init(cfg);
 
     pluginbox_status = PLUGIN_RUNNING;
@@ -726,7 +734,6 @@ static int check_args(int i, int argc, char **argv) {
 
 int main(int argc, char **argv) {
     int cf_index;
-    Octstr *filename;
 
     gwlib_init();
 
@@ -734,21 +741,19 @@ int main(int argc, char **argv) {
     setup_signal_handlers();
 
     if (argv[cf_index] == NULL) {
-        filename = octstr_create("pluginbox.conf");
+        cfg_filename = octstr_create("pluginbox.conf");
     } else {
-        filename = octstr_create(argv[cf_index]);
+        cfg_filename = octstr_create(argv[cf_index]);
     }
 
-    cfg = cfg_create(filename);
+    cfg = cfg_create(cfg_filename);
 
     /* Adding cfg-checks to core */
 
     cfg_add_hooks(pluginbox_is_allowed_in_group, pluginbox_is_single_group);
 
     if (cfg_read(cfg) == -1)
-        panic(0, "Couldn't read configuration from `%s'.", octstr_get_cstr(filename));
-
-    octstr_destroy(filename);
+        panic(0, "Couldn't read configuration from `%s'.", octstr_get_cstr(cfg_filename));
 
     report_versions("pluginbox");
 
@@ -764,11 +769,70 @@ int main(int argc, char **argv) {
         gwthread_sleep(1.0);
     }
 
+    httpadmin_stop();
     pluginbox_plugin_shutdown();
 
     gwlib_shutdown();
 
+    if (NULL != cfg_filename) octstr_destroy(cfg_filename);
+
     if (restart_pluginbox)
         execvp(argv[0], argv);
     return 0;
+}
+
+/* http admin functions */
+
+char *plugin_status_linebreak(int status_type)
+{
+    switch (status_type) {
+        case PLUGINSTATUS_HTML:
+            return "<br>\n";
+        case PLUGINSTATUS_WML:
+            return "<br/>\n";
+        case PLUGINSTATUS_TEXT:
+            return "\n";
+        case PLUGINSTATUS_XML:
+            return "\n";
+        default:
+            return NULL;
+    }
+}
+
+Octstr *plugin_print_status(List *cgivars, int status_type)
+{
+	pluginbox_get_status(cgivars, status_type);
+}
+
+int plugin_remove_plugin(Octstr *plugin)
+{
+	return pluginbox_remove_plugin(plugin);
+}
+
+int plugin_add_plugin(Octstr *plugin)
+{
+    Cfg *cfg;
+
+    cfg = cfg_create(cfg_filename);
+
+    /* Adding cfg-checks to core */
+
+    if (cfg_read(cfg) == -1)
+        panic(0, "Couldn't read configuration from `%s'.", octstr_get_cstr(cfg_filename));
+
+    int result = pluginbox_add_plugin(cfg, plugin);
+
+    cfg_destroy(cfg);
+
+    return result;
+}
+
+int plugin_restart_plugin(Octstr *plugin)
+{
+	return plugin_add_plugin(plugin);
+}
+
+Octstr *plugin_status_plugin(Octstr *plugin, List *cgivars, int status_type)
+{
+	return pluginbox_status_plugin(plugin, cgivars, status_type);
 }

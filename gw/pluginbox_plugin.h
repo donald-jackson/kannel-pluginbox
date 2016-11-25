@@ -71,6 +71,15 @@ extern "C" {
     
 #define PLUGINBOX_MESSAGE_FROM_SMSBOX 1
 #define PLUGINBOX_MESSAGE_FROM_BEARERBOX 2
+
+	/* type of output given by various status functions */
+	enum {
+    		PLUGINSTATUS_HTML = 0,
+    		PLUGINSTATUS_TEXT = 1,
+    		PLUGINSTATUS_WML = 2,
+    		PLUGINSTATUS_XML = 3
+	};
+
     
     typedef struct PluginBoxPlugin PluginBoxPlugin;
     typedef struct PluginBoxMsg PluginBoxMsg;
@@ -80,6 +89,7 @@ extern "C" {
         int (*init)(PluginBoxPlugin *pluginbox_plugin);
         void (*process)(PluginBoxPlugin *pluginbox_plugin, PluginBoxMsg *pluginbox_msg);
         void (*shutdown)(PluginBoxPlugin *pluginbox_plugin);
+        Octstr *(*status)(PluginBoxPlugin *pluginbox_plugin, List *cgivars, int status_type);
         void *context;
         Octstr *path;
         long priority;
@@ -101,6 +111,10 @@ extern "C" {
     int pluginbox_plugins_init(Cfg *cfg);
     void pluginbox_plugin_shutdown();
     void pluginbox_plugins_start(void (*done)(void *context, Msg *msg, int status), void *context, Msg *msg, long type);
+    int pluginbox_remove_plugin(Octstr *plugin);
+    int pluginbox_add_plugin(Cfg *cfg, Octstr *plugin);
+    Octstr *pluginbox_get_status(List *cgivars, int status_type);
+    Octstr *pluginbox_status_plugin(Octstr *plugin, List *cgivars, int status_type);
 
 #ifdef __cplusplus
 }

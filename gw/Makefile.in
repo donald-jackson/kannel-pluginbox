@@ -65,7 +65,7 @@ CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(sbindir)"
 PROGRAMS = $(sbin_PROGRAMS)
-am_pluginbox_OBJECTS = pluginbox.$(OBJEXT) pluginbox_plugin.$(OBJEXT)
+am_pluginbox_OBJECTS = pluginbox.$(OBJEXT) pluginbox_plugin.$(OBJEXT) pluginbox_http.$(OBJEXT)
 pluginbox_OBJECTS = $(am_pluginbox_OBJECTS)
 pluginbox_LDADD = $(LDADD)
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
@@ -224,7 +224,7 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-pluginbox_SOURCES = pluginbox.c pluginbox_plugin.c
+pluginbox_SOURCES = pluginbox.c pluginbox_plugin.c pluginbox_http.c
 EXTRA_DIST = 
 all: all-am
 

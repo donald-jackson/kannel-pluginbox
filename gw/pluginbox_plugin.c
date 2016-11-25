@@ -68,7 +68,7 @@ static List *all_plugins;
 RWLock *configurationlock;
 
 PluginBoxMsg *pluginbox_msg_create() {
-    PluginBoxMsg *pluginbox_msg = gw_malloc(sizeof (PluginBoxMsg));
+    PluginBoxMsg *pluginbox_msg = gw_malloc(sizeof(PluginBoxMsg));
     pluginbox_msg->callback = NULL;
     pluginbox_msg->done = NULL;
     pluginbox_msg->chain = 0;
@@ -89,7 +89,7 @@ int pluginbox_plugin_compare(const PluginBoxPlugin *a, const PluginBoxPlugin *b)
 }
 
 PluginBoxPlugin *pluginbox_plugin_create() {
-    PluginBoxPlugin *pluginbox_plugin = gw_malloc(sizeof (PluginBoxPlugin));
+    PluginBoxPlugin *pluginbox_plugin = gw_malloc(sizeof(PluginBoxPlugin));
     pluginbox_plugin->process = NULL;
     pluginbox_plugin->path = NULL;
     pluginbox_plugin->args = NULL;
@@ -100,19 +100,19 @@ PluginBoxPlugin *pluginbox_plugin_create() {
 }
 
 void pluginbox_plugin_destroy(PluginBoxPlugin *pluginbox_plugin) {
-    if(pluginbox_plugin->shutdown) {
+    if (pluginbox_plugin->shutdown) {
         pluginbox_plugin->shutdown(pluginbox_plugin);
     }
-    
+
     if (NULL != pluginbox_plugin->path) octstr_destroy(pluginbox_plugin->path);
     if (NULL != pluginbox_plugin->args) octstr_destroy(pluginbox_plugin->args);
     if (NULL != pluginbox_plugin->id) octstr_destroy(pluginbox_plugin->id);
-    
+
     gw_free(pluginbox_plugin);
 }
 
 void pluginbox_plugins_done(PluginBoxMsg *pluginbox_msg) {
-    if(pluginbox_msg->done) {
+    if (pluginbox_msg->done) {
         pluginbox_msg->done(pluginbox_msg->context, pluginbox_msg->msg, pluginbox_msg->status);
     }
     pluginbox_msg_destroy(pluginbox_msg);
@@ -130,16 +130,16 @@ void pluginbox_plugins_next(PluginBoxMsg *pluginbox_msg) {
     if (pluginbox_msg->type & PLUGINBOX_MESSAGE_FROM_BEARERBOX) {
         target = bearerbox_inbound_plugins;
     }
-    
-    if((target != NULL) && (pluginbox_msg->status != PLUGINBOX_MESSAGE_REJECT)) {
+
+    if ((target != NULL) && (pluginbox_msg->status != PLUGINBOX_MESSAGE_REJECT)) {
         long len = gwlist_len(target);
-        if(pluginbox_msg->chain < len) {
+        if (pluginbox_msg->chain < len) {
             /* We're OK */
             PluginBoxPlugin *plugin = gwlist_get(target, pluginbox_msg->chain);
-            if(plugin != NULL) {
+            if (plugin != NULL) {
                 ++pluginbox_msg->chain;
                 plugin->process(plugin, pluginbox_msg);
-		gw_rwlock_unlock(configurationlock);
+                gw_rwlock_unlock(configurationlock);
                 return;
             }
         }
@@ -160,63 +160,63 @@ void pluginbox_plugins_start(void (*done)(void *context, Msg *msg, int status), 
 
 }
 
-static PluginBoxPlugin *pluginbox_plugins_add(Cfg *cfg, Octstr *id, CfgGroup *grp)
-{
-	/* we assume the configuration is write-locked */
-	long tmp_long;
-	void *lib;
-	char *error_str;
-	Octstr *tmp_str, *path;
+static PluginBoxPlugin *pluginbox_plugins_add(Cfg *cfg, Octstr *id, CfgGroup *grp) {
+    /* we assume the configuration is write-locked */
+    long tmp_long;
+    void *lib;
+    char *error_str;
+    Octstr *tmp_str, *path;
 
-        if (cfg_get_integer(&tmp_long, grp, octstr_imm("priority")) == -1) {
-            tmp_long = 0;
+    if (cfg_get_integer(&tmp_long, grp, octstr_imm("priority")) == -1) {
+        tmp_long = 0;
+    }
+
+    PluginBoxPlugin *plugin;
+    plugin = pluginbox_plugin_create();
+    plugin->id = id;
+    plugin->path = cfg_get(grp, octstr_imm("path"));
+    plugin->priority = tmp_long;
+    plugin->running_configuration = cfg;
+
+    if (!octstr_len(plugin->path)) {
+        error(0, "No 'path' specified for pluginbox-plugin group");
+        pluginbox_plugin_destroy(plugin);
+        return NULL;
+    }
+
+    lib = dlopen(octstr_get_cstr(plugin->path), RTLD_NOW | RTLD_GLOBAL);
+
+    if (!lib) {
+        error_str = dlerror();
+        error(0, "Error opening plugin '%s' (%s)", octstr_get_cstr(plugin->path), error_str);
+        pluginbox_plugin_destroy(plugin);
+        return NULL;
+    }
+
+    tmp_str = cfg_get(grp, octstr_imm("init"));
+    if (octstr_len(tmp_str)) {
+        plugin->init = dlsym(lib, octstr_get_cstr(tmp_str));
+        if (!plugin->init) {
+            error(0, "init-function %s unable to load from %s", octstr_get_cstr(tmp_str),
+                  octstr_get_cstr(plugin->path));
+            pluginbox_plugin_destroy(plugin);
+            return NULL;
         }
-
-	PluginBoxPlugin *plugin;
-        plugin = pluginbox_plugin_create();
-        plugin->id = id;
-        plugin->path = cfg_get(grp, octstr_imm("path"));
-        plugin->priority = tmp_long;
-        plugin->running_configuration = cfg;
-
-        if (!octstr_len(plugin->path)) {
-            error(0, "No 'path' specified for pluginbox-plugin group");
-	    pluginbox_plugin_destroy(plugin);
-	    return NULL;
-        }
-
-        lib = dlopen(octstr_get_cstr(plugin->path), RTLD_NOW | RTLD_GLOBAL);
-
-        if (!lib) {
-            error_str = dlerror();
-            error(0, "Error opening plugin '%s' (%s)", octstr_get_cstr(plugin->path), error_str);
-	    pluginbox_plugin_destroy(plugin);
-	    return NULL;
-        }
-
-        tmp_str = cfg_get(grp, octstr_imm("init"));
-        if (octstr_len(tmp_str)) {
-            plugin->init = dlsym(lib, octstr_get_cstr(tmp_str));
-            if (!plugin->init) {
-                error(0, "init-function %s unable to load from %s", octstr_get_cstr(tmp_str), octstr_get_cstr(plugin->path));
-		pluginbox_plugin_destroy(plugin);
-		return NULL;
-            }
-            plugin->args = cfg_get(grp, octstr_imm("args"));
-            if (!plugin->init(plugin)) {
-               	error(0, "Plugin %s initialization failed", octstr_get_cstr(plugin->path));
-		pluginbox_plugin_destroy(plugin);
-		return NULL;
-            } else {
-               	info(0, "Plugin %s initialized priority %ld", octstr_get_cstr(plugin->path), plugin->priority);
-            }
+        plugin->args = cfg_get(grp, octstr_imm("args"));
+        if (!plugin->init(plugin)) {
+            error(0, "Plugin %s initialization failed", octstr_get_cstr(plugin->path));
+            pluginbox_plugin_destroy(plugin);
+            return NULL;
         } else {
-            error(0, "No initialization 'init' function specified, cannot continue (%s)", octstr_get_cstr(plugin->path));
-	    pluginbox_plugin_destroy(plugin);
-	    return NULL;
+            info(0, "Plugin %s initialized priority %ld", octstr_get_cstr(plugin->path), plugin->priority);
         }
-        octstr_destroy(tmp_str);
-	return plugin;
+    } else {
+        error(0, "No initialization 'init' function specified, cannot continue (%s)", octstr_get_cstr(plugin->path));
+        pluginbox_plugin_destroy(plugin);
+        return NULL;
+    }
+    octstr_destroy(tmp_str);
+    return plugin;
 }
 
 int pluginbox_plugins_init(Cfg *cfg) {
@@ -225,7 +225,7 @@ int pluginbox_plugins_init(Cfg *cfg) {
     bearerbox_inbound_plugins = gwlist_create();
     all_plugins = gwlist_create();
 
-    gw_prioqueue_t *prioqueue = gw_prioqueue_create((int(*)(const void *, const void *))pluginbox_plugin_compare);
+    gw_prioqueue_t *prioqueue = gw_prioqueue_create((int (*)(const void *, const void *)) pluginbox_plugin_compare);
 
     int tmp_dead;
     List *grplist = cfg_get_multi_group(cfg, octstr_imm("pluginbox-plugin"));
@@ -235,35 +235,37 @@ int pluginbox_plugins_init(Cfg *cfg) {
 
     gw_rwlock_wrlock(configurationlock);
     while (grplist && (grp = gwlist_extract_first(grplist)) != NULL) {
-	id = cfg_get(grp, octstr_imm("id"));
-	if (cfg_get_bool(&tmp_dead, grp, octstr_imm("dead-start")) != -1) {
-		if (tmp_dead) {
-			debug("pluginbox.plugin.init", 0, "Skipping plugin %s", octstr_get_cstr(id));
-			octstr_destroy(id);
-			continue;
-		}
-	}
-	plugin = pluginbox_plugins_add(cfg, id, grp);
-	if (NULL != plugin) {
-		gw_prioqueue_produce(prioqueue, plugin);
-	}
+        id = cfg_get(grp, octstr_imm("id"));
+        if (cfg_get_bool(&tmp_dead, grp, octstr_imm("dead-start")) != -1) {
+            if (tmp_dead) {
+                debug("pluginbox.plugin.init", 0, "Skipping plugin %s", octstr_get_cstr(id));
+                octstr_destroy(id);
+                continue;
+            }
+        }
+        plugin = pluginbox_plugins_add(cfg, id, grp);
+        if (NULL != plugin) {
+            gw_prioqueue_produce(prioqueue, plugin);
+        }
     }
 
     while ((plugin = gw_prioqueue_consume(prioqueue)) != NULL) {
         gwlist_produce(all_plugins, plugin);
 
         if (plugin->direction & PLUGINBOX_MESSAGE_FROM_SMSBOX) {
-            debug("pluginbox.plugin.init", 0, "Adding plugin %s to from smsbox process queue", octstr_get_cstr(plugin->path));
+            debug("pluginbox.plugin.init", 0, "Adding plugin %s to from smsbox process queue",
+                  octstr_get_cstr(plugin->path));
             gwlist_produce(smsbox_inbound_plugins, plugin);
         }
         if (plugin->direction & PLUGINBOX_MESSAGE_FROM_BEARERBOX) {
-            debug("pluginbox.plugin.init", 0, "Adding plugin %s to from bearerbox process queue", octstr_get_cstr(plugin->path));
+            debug("pluginbox.plugin.init", 0, "Adding plugin %s to from bearerbox process queue",
+                  octstr_get_cstr(plugin->path));
             gwlist_produce(bearerbox_inbound_plugins, plugin);
         }
     }
-    
+
     gwlist_destroy(grplist, NULL);
-    
+
     gw_prioqueue_destroy(prioqueue, NULL);
     gw_rwlock_unlock(configurationlock);
 }
@@ -271,71 +273,69 @@ int pluginbox_plugins_init(Cfg *cfg) {
 void pluginbox_plugin_shutdown() {
     gwlist_destroy(smsbox_inbound_plugins, NULL);
     gwlist_destroy(bearerbox_inbound_plugins, NULL);
-    
-    gwlist_destroy(all_plugins, (void (*)(void *))pluginbox_plugin_destroy);
+
+    gwlist_destroy(all_plugins, (void (*)(void *)) pluginbox_plugin_destroy);
     gw_rwlock_destroy(configurationlock);
 }
 
 /* http admin functions */
 
-static PluginBoxPlugin *find_plugin(Octstr *plugin)
-{
-	/* we assume the list is read-locked */
-	int i;
-	PluginBoxPlugin *res;
+static PluginBoxPlugin *find_plugin(Octstr *plugin) {
+    /* we assume the list is read-locked */
+    int i;
+    PluginBoxPlugin *res;
 
-	for (i = 0; i < gwlist_len(all_plugins); i++) {
-		res = gwlist_get(all_plugins, i);
-		if (NULL != res && octstr_compare(plugin, res->id) == 0) {
-			return res;
-		}
-	}
-	return NULL;
+    for (i = 0; i < gwlist_len(all_plugins); i++) {
+        res = gwlist_get(all_plugins, i);
+        if (NULL != res && octstr_compare(plugin, res->id) == 0) {
+            return res;
+        }
+    }
+    return NULL;
 }
 
-static Octstr *nosuchplugin(Octstr *plugin, int status_type)
-{
-	return octstr_format("Plugin with id %s not found.", octstr_get_cstr(plugin));
+static Octstr *nosuchplugin(Octstr *plugin, int status_type) {
+    return octstr_format("Plugin with id %s not found.", octstr_get_cstr(plugin));
 }
 
-int pluginbox_remove_plugin(Octstr *pluginname)
-{
-	int i;
-	PluginBoxPlugin *plugin;
+int pluginbox_remove_plugin(Octstr *pluginname) {
+    int i;
+    PluginBoxPlugin *plugin;
 
-	gw_rwlock_wrlock(configurationlock);
-	for (i = 0; i < gwlist_len(smsbox_inbound_plugins); i++) {
-		plugin = gwlist_get(smsbox_inbound_plugins, i);
-		if (octstr_compare(pluginname, plugin->id) == 0) {
-			debug("pluginbox.plugin.remove", 0, "Plugin %s removed from smsbox inbound plugins.", octstr_get_cstr(pluginname));
-			gwlist_delete(smsbox_inbound_plugins, i, 1);
-			break;
-		}
-	}
-	for (i = 0; i < gwlist_len(bearerbox_inbound_plugins); i++) {
-		plugin = gwlist_get(bearerbox_inbound_plugins, i);
-		if (octstr_compare(pluginname, plugin->id) == 0) {
-			debug("pluginbox.plugin.remove", 0, "Plugin %s removed from bearerbox inbound plugins.", octstr_get_cstr(pluginname));
-			gwlist_delete(bearerbox_inbound_plugins, i, 1);
-			break;
-		}
-	}
-	for (i = 0; i < gwlist_len(all_plugins); i++) {
-		plugin = gwlist_get(all_plugins, i);
-		if (octstr_compare(pluginname, plugin->id) == 0) {
-			pluginbox_plugin_destroy(plugin);
-			gwlist_delete(all_plugins, i, 1);
-			gw_rwlock_unlock(configurationlock);
-			return 1;
-		}
-	}
-	gw_rwlock_unlock(configurationlock);
-        debug("pluginbox.plugin.remove", 0, "Plugin %s not found.", octstr_get_cstr(pluginname));
-	return 0;
+    gw_rwlock_wrlock(configurationlock);
+    for (i = 0; i < gwlist_len(smsbox_inbound_plugins); i++) {
+        plugin = gwlist_get(smsbox_inbound_plugins, i);
+        if (octstr_compare(pluginname, plugin->id) == 0) {
+            debug("pluginbox.plugin.remove", 0, "Plugin %s removed from smsbox inbound plugins.",
+                  octstr_get_cstr(pluginname));
+            gwlist_delete(smsbox_inbound_plugins, i, 1);
+            break;
+        }
+    }
+    for (i = 0; i < gwlist_len(bearerbox_inbound_plugins); i++) {
+        plugin = gwlist_get(bearerbox_inbound_plugins, i);
+        if (octstr_compare(pluginname, plugin->id) == 0) {
+            debug("pluginbox.plugin.remove", 0, "Plugin %s removed from bearerbox inbound plugins.",
+                  octstr_get_cstr(pluginname));
+            gwlist_delete(bearerbox_inbound_plugins, i, 1);
+            break;
+        }
+    }
+    for (i = 0; i < gwlist_len(all_plugins); i++) {
+        plugin = gwlist_get(all_plugins, i);
+        if (octstr_compare(pluginname, plugin->id) == 0) {
+            pluginbox_plugin_destroy(plugin);
+            gwlist_delete(all_plugins, i, 1);
+            gw_rwlock_unlock(configurationlock);
+            return 1;
+        }
+    }
+    gw_rwlock_unlock(configurationlock);
+    debug("pluginbox.plugin.remove", 0, "Plugin %s not found.", octstr_get_cstr(pluginname));
+    return 0;
 }
 
-int pluginbox_add_plugin(Cfg *cfg, Octstr *pluginname)
-{
+int pluginbox_add_plugin(Cfg *cfg, Octstr *pluginname) {
     List *grplist = cfg_get_multi_group(cfg, octstr_imm("pluginbox-plugin"));
     PluginBoxPlugin *plugin;
     CfgGroup *grp;
@@ -345,31 +345,32 @@ int pluginbox_add_plugin(Cfg *cfg, Octstr *pluginname)
 
     gw_rwlock_wrlock(configurationlock);
     for (i = 0; i < gwlist_len(all_plugins); i++) {
-	plugin = gwlist_get(all_plugins, i);
-	if (octstr_compare(pluginname, plugin->id) == 0) {
-    	    gw_rwlock_unlock(configurationlock);
+        plugin = gwlist_get(all_plugins, i);
+        if (octstr_compare(pluginname, plugin->id) == 0) {
+            gw_rwlock_unlock(configurationlock);
             debug("pluginbox.plugin.add", 0, "Plugin %s already added.", octstr_get_cstr(plugin->id));
-	    return 0;
-	}
+            gwlist_destroy(grplist, NULL);
+            return 0;
+        }
     }
-    gw_prioqueue_t *prioqueue = gw_prioqueue_create((int(*)(const void *, const void *))pluginbox_plugin_compare);
+    gw_prioqueue_t *prioqueue = gw_prioqueue_create((int (*)(const void *, const void *)) pluginbox_plugin_compare);
     while ((plugin = gwlist_consume(all_plugins)) != NULL) {
-	gw_prioqueue_produce(prioqueue, plugin);
+        gw_prioqueue_produce(prioqueue, plugin);
     }
 
     while (grplist && (grp = gwlist_extract_first(grplist)) != NULL) {
-	id = cfg_get(grp, octstr_imm("id"));
-	if (octstr_compare(id, pluginname) == 0) {
-		plugin = pluginbox_plugins_add(cfg, id, grp);
-		if (NULL != plugin) {
-			gw_prioqueue_produce(prioqueue, plugin);
-			found = -1;
-			break;
-		}
-	}
+        id = cfg_get(grp, octstr_imm("id"));
+        if (octstr_compare(id, pluginname) == 0) {
+            plugin = pluginbox_plugins_add(cfg, id, grp);
+            if (NULL != plugin) {
+                gw_prioqueue_produce(prioqueue, plugin);
+                found = -1;
+                break;
+            }
+        }
     }
     if (0 == found) {
-            debug("pluginbox.plugin.add", 0, "Plugin %s not found in configuration file.", octstr_get_cstr(pluginname));
+        debug("pluginbox.plugin.add", 0, "Plugin %s not found in configuration file.", octstr_get_cstr(pluginname));
     }
 
     /* re-initialize lists */
@@ -382,24 +383,25 @@ int pluginbox_add_plugin(Cfg *cfg, Octstr *pluginname)
         gwlist_produce(all_plugins, plugin);
 
         if (plugin->direction & PLUGINBOX_MESSAGE_FROM_SMSBOX) {
-            debug("pluginbox.plugin.add", 0, "Adding plugin %s to from smsbox process queue", octstr_get_cstr(plugin->path));
+            debug("pluginbox.plugin.add", 0, "Adding plugin %s to from smsbox process queue",
+                  octstr_get_cstr(plugin->path));
             gwlist_produce(smsbox_inbound_plugins, plugin);
         }
         if (plugin->direction & PLUGINBOX_MESSAGE_FROM_BEARERBOX) {
-            debug("pluginbox.plugin.add", 0, "Adding plugin %s to from bearerbox process queue", octstr_get_cstr(plugin->path));
+            debug("pluginbox.plugin.add", 0, "Adding plugin %s to from bearerbox process queue",
+                  octstr_get_cstr(plugin->path));
             gwlist_produce(bearerbox_inbound_plugins, plugin);
         }
     }
     gw_rwlock_unlock(configurationlock);
-    
+
     gwlist_destroy(grplist, NULL);
-    
+
     gw_prioqueue_destroy(prioqueue, NULL);
     return found;
 }
 
-Octstr *pluginbox_get_status(List *cgivars, int status_type)
-{
+Octstr *pluginbox_get_status(List *cgivars, int status_type) {
     const char *fmt1, *fmt2;
     Octstr *res, *final;
     int i;
@@ -408,28 +410,29 @@ Octstr *pluginbox_get_status(List *cgivars, int status_type)
     switch (status_type) {
         case PLUGINSTATUS_HTML:
             fmt1 = "<table>\n<tr><th>id</td><th>path</th><th>args</th></tr>\n%s</table>";
-	    fmt2 = "<tr><td>%ld</td><td>%s</td><td>%s</td><td>%s</td></tr>\n";
-	    break;
+            fmt2 = "<tr><td>%ld</td><td>%s</td><td>%s</td><td>%s</td></tr>\n";
+            break;
         case PLUGINSTATUS_WML:
-	    // Todo. Who uses wap?
+            // Todo. Who uses wap?
             fmt1 = "%s";
-	    fmt2 = "%ld %s %s %s ";
-	    break;
+            fmt2 = "%ld %s %s %s ";
+            break;
         case PLUGINSTATUS_XML:
             fmt1 = "<plugins>\n%s</plugins>";
-	    fmt2 = "<plugin>\n    <priority>%ld</priority>\n    <id>%s</id>\n    <path>%s</path>\n    <args>%s</args>\n</plugin>\n";
-	    break;
+            fmt2 = "<plugin>\n    <priority>%ld</priority>\n    <id>%s</id>\n    <path>%s</path>\n    <args>%s</args>\n</plugin>\n";
+            break;
         case PLUGINSTATUS_TEXT:
-	default:
+        default:
             fmt1 = "Loaded plugins:\n\n%s";
-	    fmt2 = "Priority: %ld.\nPlugin: %s.\nPath  : %s.\nArgs  : %s.\n\n";
-	    break;
+            fmt2 = "Priority: %ld.\nPlugin: %s.\nPath  : %s.\nArgs  : %s.\n\n";
+            break;
     }
     gw_rwlock_rdlock(configurationlock);
     res = octstr_create("");
     for (i = 0; i < gwlist_len(all_plugins); i++) {
-	plugin = gwlist_get(all_plugins, i);
-	octstr_format_append(res, fmt2, plugin->priority, octstr_get_cstr(plugin->id), octstr_get_cstr(plugin->path), octstr_get_cstr(plugin->args));
+        plugin = gwlist_get(all_plugins, i);
+        octstr_format_append(res, fmt2, plugin->priority, octstr_get_cstr(plugin->id), octstr_get_cstr(plugin->path),
+                             octstr_get_cstr(plugin->args));
     }
     gw_rwlock_unlock(configurationlock);
     final = octstr_format(fmt1, octstr_get_cstr(res));
@@ -437,20 +440,18 @@ Octstr *pluginbox_get_status(List *cgivars, int status_type)
     return final;
 }
 
-Octstr *pluginbox_status_plugin(Octstr *pluginname, List *cgivars, int status_type)
-{
-	PluginBoxPlugin *plugin;
-	Octstr *res;
+Octstr *pluginbox_status_plugin(Octstr *pluginname, List *cgivars, int status_type) {
+    PluginBoxPlugin *plugin;
+    Octstr *res;
 
-	gw_rwlock_rdlock(configurationlock);
-	if (NULL == (plugin = find_plugin(pluginname))) {
-		res = nosuchplugin(pluginname, status_type);
-	} else if (NULL != plugin->status) {
-		res = plugin->status(plugin, cgivars, status_type);
-	}
-	else {
-		res = octstr_create("Plugin doesnt support status querying.\n");
-	}
-	gw_rwlock_unlock(configurationlock);
-	return res;
+    gw_rwlock_rdlock(configurationlock);
+    if (NULL == (plugin = find_plugin(pluginname))) {
+        res = nosuchplugin(pluginname, status_type);
+    } else if (NULL != plugin->status) {
+        res = plugin->status(plugin, cgivars, status_type);
+    } else {
+        res = octstr_create("Plugin doesnt support status querying.\n");
+    }
+    gw_rwlock_unlock(configurationlock);
+    return res;
 }

@@ -820,7 +820,11 @@ int plugin_add_plugin(Octstr *plugin)
     if (cfg_read(cfg) == -1)
         panic(0, "Couldn't read configuration from `%s'.", octstr_get_cstr(cfg_filename));
 
-    return pluginbox_add_plugin(cfg, plugin);
+    int result = pluginbox_add_plugin(cfg, plugin);
+
+    cfg_destroy(cfg);
+
+    return result;
 }
 
 int plugin_restart_plugin(Octstr *plugin)

@@ -302,6 +302,14 @@ static void smsbox_inbound_queue_plugins_done(void *context, Msg *msg, int statu
             ackmsg->ack.nack = ack_failed;
             msg_destroy(msg);
             gwlist_produce(conn->smsbox_outbound_queue, ackmsg);
+        } else if(status == PLUGINBOX_MESSAGE_DROP) {
+            warning(0, "Plugin chain has asked us to silently drop this message");
+            ackmsg = msg_create(ack);
+            uuid_copy(ackmsg->ack.id, msg->sms.id);
+            ackmsg->ack.time = msg->sms.time;
+            ackmsg->ack.nack = ack_success;
+            msg_destroy(msg);
+            gwlist_produce(conn->smsbox_outbound_queue, ackmsg);
         } else {
             gwlist_produce(conn->bearerbox_outbound_queue, msg);
         }

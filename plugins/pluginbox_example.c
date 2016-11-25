@@ -70,6 +70,14 @@ void pluginbox_example_process(PluginBoxPlugin *pluginbox_plugin, PluginBoxMsg *
     debug("pluginbox.example.process", 0, "Got plugin message chain %ld", pluginbox_msg->chain);
     
     Msg *msg = pluginbox_msg->msg;
+
+    if(msg_type(msg) == sms) {
+        if (octstr_compare(msg->sms.receiver, octstr_imm("12345")) == 0) {
+            debug("pluginbox.example.process", 0, "Silently dropping message to 12345");
+            pluginbox_msg->status = PLUGINBOX_MESSAGE_DROP;
+        }
+    }
+
     
     pluginbox_msg->callback(pluginbox_msg);
 }

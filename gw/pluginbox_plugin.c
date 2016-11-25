@@ -131,7 +131,7 @@ void pluginbox_plugins_next(PluginBoxMsg *pluginbox_msg) {
         target = bearerbox_inbound_plugins;
     }
 
-    if ((target != NULL) && (pluginbox_msg->status != PLUGINBOX_MESSAGE_REJECT)) {
+    if ((target != NULL) && (pluginbox_msg->status != PLUGINBOX_MESSAGE_REJECT) && (pluginbox_msg->status != PLUGINBOX_MESSAGE_DROP)) {
         long len = gwlist_len(target);
         if (pluginbox_msg->chain < len) {
             /* We're OK */

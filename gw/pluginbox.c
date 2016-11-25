@@ -61,6 +61,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include <string.h>
+#include <gw/msg.h>
 
 #include "gwlib/gwlib.h"
 #include "gw/msg.h"
@@ -87,6 +88,9 @@ static long bearerbox_port;
 static Octstr *bearerbox_host;
 static int bearerbox_port_ssl = 0;
 
+List *connected_boxes;
+RWLock *connected_box_lock;
+
 Octstr *pluginbox_id;
 
 /* our status */
@@ -107,7 +111,109 @@ typedef struct _boxc {
     List *bearerbox_inbound_queue; /* The queue that contains messages from bearerbox -> pluginbox */
     List *bearerbox_outbound_queue; /* The queue that contains messages from pluginbox -> bearerbox */
     Counter *pending_counter;
+    Dict *injected_pending_acks;
 } Boxc;
+
+typedef struct {
+    void *context;
+    void (*callback)(ack_status_t status, void *context);
+} AckCallback;
+
+static Octstr *msg_uuid_get(uuid_t my_uuid) {
+    char buffer[UUID_STR_LEN + 1];
+
+    uuid_unparse(my_uuid, buffer);
+
+    return octstr_create(buffer);
+}
+
+static AckCallback *ack_callback_create() {
+    AckCallback *ack_callback = gw_malloc(sizeof(AckCallback));
+    ack_callback->callback = NULL;
+    ack_callback->context = NULL;
+    return ack_callback;
+}
+
+static void ack_callback_destroy(AckCallback *ack_callback) {
+    if(ack_callback->callback) {
+        ack_callback->callback(ack_failed_tmp, ack_callback->context);
+    }
+    gw_free(ack_callback);
+}
+
+
+int pluginbox_inject_message(int emulate, Octstr *boxc_id, Msg *msg, void (*callback)(ack_status_t ack_status, void *context), void *context) {
+    if(msg_type(msg) != sms) {
+        warning(0, "Requested to inject a non-sms type, ignored!");
+        return 0;
+    }
+
+    gw_rwlock_rdlock(connected_box_lock);
+
+    long i, num;
+
+    num = gwlist_len(connected_boxes);
+    Boxc *box;
+
+    Octstr *msg_id;
+
+    List *target = NULL;
+    AckCallback *ack_callback;
+
+    int found = 0;
+    for(i=0;i<num;i++) {
+        box = gwlist_get(connected_boxes, i);
+
+        if(!octstr_len(boxc_id)) {
+            /* Any box will do */
+            found = 1;
+            break;
+        }
+
+        if(!octstr_len(box->boxc_id)) {
+            /* plugin requested specific ID, this one is null, can't use it */
+            continue;
+        }
+
+
+
+        if(octstr_compare(boxc_id, box->boxc_id) == 0) {
+            /* found matching requested ID */
+            found = 1;
+            break;
+        }
+    }
+
+    if(found) {
+        if(emulate == PLUGINBOX_MESSAGE_FROM_BEARERBOX) {
+            target = box->smsbox_outbound_queue;
+            debug("pluginbox.inject.message", 0, "Injected message towards smsbox %s", octstr_get_cstr(box->boxc_id));
+        } else if (emulate == PLUGINBOX_MESSAGE_FROM_SMSBOX) {
+            target = box->bearerbox_outbound_queue;
+            debug("pluginbox.inject.message", 0, "Injected message towards bearerbox %s", octstr_get_cstr(box->boxc_id));
+        } else {
+            warning(0, "Unknown target emulation! %d", emulate);
+            found = 0;
+        }
+
+        if(target) {
+            if(callback) {
+                msg_id = msg_uuid_get(msg->sms.id);
+                ack_callback = ack_callback_create();
+                ack_callback->context = context;
+                ack_callback->callback = callback;
+                dict_put(box->injected_pending_acks, msg_id, ack_callback);
+                debug("pluginbox.inject.message", 0, "Added %s to open injected acks", octstr_get_cstr(msg_id));
+                octstr_destroy(msg_id);
+            }
+            gwlist_produce(target, msg);
+        }
+    }
+
+    gw_rwlock_unlock(connected_box_lock);
+    return found;
+
+}
 
 /*
  * Adding hooks to kannel check config
@@ -173,6 +279,7 @@ static Boxc *boxc_create(int fd, Octstr *ip, int ssl) {
     boxc->bearerbox_inbound_queue = gwlist_create();
     boxc->bearerbox_outbound_queue = gwlist_create();
     boxc->pending_counter = counter_create();
+    boxc->injected_pending_acks = dict_create(512, NULL);
     return boxc;
 }
 
@@ -194,6 +301,8 @@ static void boxc_destroy(Boxc *boxc) {
     gwlist_destroy(boxc->bearerbox_inbound_queue, (void(*)(void *))msg_destroy);
     gwlist_destroy(boxc->bearerbox_outbound_queue, (void(*)(void *))msg_destroy);
     counter_destroy(boxc->pending_counter);
+
+    dict_destroy(boxc->injected_pending_acks);
     gw_free(boxc);
 }
 
@@ -420,6 +529,8 @@ static void bearerbox_to_smsbox(void *arg) {
     gwlist_add_producer(conn->bearerbox_inbound_queue);
 
     long inbound_thread = gwthread_create(bearerbox_inbound_queue_thread, conn);
+    Octstr *msg_id;
+    AckCallback *ack_callback;
 
     while (pluginbox_status == PLUGIN_RUNNING && conn->alive) {
 
@@ -455,6 +566,17 @@ static void bearerbox_to_smsbox(void *arg) {
 
         if (msg_type(msg) == sms) {
 
+        } else if(msg_type(msg) == ack) {
+            msg_id = msg_uuid_get(msg->ack.id);
+            ack_callback = dict_remove(conn->injected_pending_acks, msg_id);
+            if(ack_callback) {
+                ack_callback->callback(msg->ack.nack, ack_callback->context);
+                ack_callback->callback = NULL;
+                ack_callback_destroy(ack_callback);
+            } else {
+                /* Normal non-injected messages, ignore */
+            }
+            octstr_destroy(msg_id);
         }
 
         gwlist_produce(conn->bearerbox_inbound_queue, msg_dupe);
@@ -478,6 +600,14 @@ static void smsbox_to_bearerbox(void *arg) {
     gwlist_add_producer(conn->smsbox_inbound_queue);
 
     long inbound_thread = gwthread_create(smsbox_inbound_queue_thread, conn);
+
+    /* Add this box to the global list */
+    gw_rwlock_wrlock(connected_box_lock);
+    gwlist_produce(connected_boxes, conn);
+    gw_rwlock_unlock(connected_box_lock);
+
+    AckCallback *ack_callback;
+    Octstr *msg_id;
 
     /* remove messages from socket until it is closed */
     while (pluginbox_status == PLUGIN_RUNNING && conn->alive) {
@@ -511,17 +641,44 @@ static void smsbox_to_bearerbox(void *arg) {
                         octstr_get_cstr(conn->boxc_id),
                         octstr_get_cstr(conn->client_ip));
             }
+        } else if(msg_type(msg) == ack) {
+            msg_id = msg_uuid_get(msg->ack.id);
+            ack_callback = dict_remove(conn->injected_pending_acks, msg_id);
+            if(ack_callback) {
+                ack_callback->callback(msg->ack.nack, ack_callback->context);
+                ack_callback->callback = NULL;
+                ack_callback_destroy(ack_callback);
+            } else {
+                /* Normal non-injected messages, ignore */
+            }
+            octstr_destroy(msg_id);
         }
 
         gwlist_produce(conn->smsbox_inbound_queue, msg_dupe);
 
         msg_destroy(msg);
     }
+
+    /* Remove this box from the global list */
+    gw_rwlock_wrlock(connected_box_lock);
+
+    if(gwlist_delete_equal(connected_boxes, conn) == 1) {
+        debug("pluginbox", 0, "Connection %s removed from global list", octstr_get_cstr(conn->boxc_id));
+    } else {
+        warning(0, "Connection %s could not be removed from global list!", octstr_get_cstr(conn->boxc_id));
+    }
+
+    gw_rwlock_unlock(connected_box_lock);
+
     conn->alive = 0;
 
     gwlist_remove_producer(conn->smsbox_inbound_queue);
 
     gwthread_join(inbound_thread);
+
+
+
+
 }
 
 static void run_pluginbox(void *arg) {
@@ -770,6 +927,9 @@ int main(int argc, char **argv) {
     long *pluginbox_port_ptr = gw_malloc(sizeof(long));
     *pluginbox_port_ptr = pluginbox_port;
 
+    connected_box_lock = gw_rwlock_create();
+    connected_boxes = gwlist_create();
+
     pluginboxc_run(pluginbox_port_ptr);
 
     cfg_destroy(cfg);
@@ -779,6 +939,9 @@ int main(int argc, char **argv) {
 
     httpadmin_stop();
     pluginbox_plugin_shutdown();
+
+    gwlist_destroy(connected_boxes, NULL);
+    gw_rwlock_destroy(connected_box_lock);
 
     gwlib_shutdown();
 

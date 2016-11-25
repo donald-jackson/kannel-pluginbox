@@ -60,6 +60,15 @@
 #include "gwlib/gwlib.h"
 #include "gw/pluginbox_plugin.h"
 
+void pluginbox_example_injected_callback(ack_status_t ack_status, void *context) {
+    Octstr *str = context;
+    debug("pluginbox.example.injected.callback", 0, "Injected callback status %d context was %s", ack_status, octstr_get_cstr(str));
+
+    /* Should delete any references here as to not requeue after shutdown */
+
+    octstr_destroy(str);
+}
+
 
 void pluginbox_example_shutdown(PluginBoxPlugin *pluginbox_plugin) {
     info(0, "Shutting down example plugin");
@@ -75,6 +84,10 @@ void pluginbox_example_process(PluginBoxPlugin *pluginbox_plugin, PluginBoxMsg *
         if (octstr_compare(msg->sms.receiver, octstr_imm("12345")) == 0) {
             debug("pluginbox.example.process", 0, "Silently dropping message to 12345");
             pluginbox_msg->status = PLUGINBOX_MESSAGE_DROP;
+        }
+        if ((pluginbox_msg->type == PLUGINBOX_MESSAGE_FROM_SMSBOX) && octstr_compare(msg->sms.receiver, octstr_imm("23456")) == 0) {
+            debug("pluginbox.example.process", 0, "Injecting a duplicate message for destination 23456");
+            pluginbox_inject_message(PLUGINBOX_MESSAGE_FROM_SMSBOX, octstr_imm("HTTP1"), msg_duplicate(msg), pluginbox_example_injected_callback, octstr_create("Sample Context"));
         }
     }
 

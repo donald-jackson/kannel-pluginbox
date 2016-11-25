@@ -117,6 +117,12 @@ extern "C" {
     Octstr *pluginbox_get_status(List *cgivars, int status_type);
     Octstr *pluginbox_status_plugin(Octstr *plugin, List *cgivars, int status_type);
 
+    /*
+     * Once the message is acknowledged by the target box, the callback function will be called with the originally supplied context
+     * to indicate the status
+     */
+    int pluginbox_inject_message(int emulate, Octstr *boxc_id, Msg *msg, void (*callack)(ack_status_t ack_status, void *context), void *context);
+
 #ifdef __cplusplus
 }
 #endif

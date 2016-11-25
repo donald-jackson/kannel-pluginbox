@@ -62,6 +62,8 @@
 #include "gw/smsc/smpp_pdu.h"
 #include "pluginbox_plugin.h"
 
+
+extern int pluginbox_inject_message(int emulate, Octstr *boxc_id, Msg *msg, void (*callack)(ack_status_t ack_status, void *context), void *context);
 static List *smsbox_inbound_plugins;
 static List *bearerbox_inbound_plugins;
 static List *all_plugins;

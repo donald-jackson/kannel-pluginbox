@@ -18,6 +18,8 @@ static Octstr *sqlbox_insert_table;
 
 static DBPool *pool = NULL;
 
+#define SQLBOX_TRACE
+
 static void mysql_update(const Octstr *sql)
 {
     int state;
@@ -34,11 +36,12 @@ static void mysql_update(const Octstr *sql)
     }
 
     state = mysql_query(pc->conn, octstr_get_cstr(sql));
-    if (state != 0)
+    if (state != 0) {
         error(0, "MYSQL: %s", mysql_error(pc->conn));
         if (mysql_errno(pc->conn) == MYSQL_ERR_NOSUCHFIELD) {
             error(0, "Try to recreate insert and log tables. The structure may have changed. See ChangeLog.");
         }
+    }
 
     dbpool_conn_produce(pc);
 }
@@ -86,22 +89,18 @@ void sqlbox_configure_mysql(Cfg* cfg)
     if (sqlbox_logtable == NULL) {
         panic(0, "No 'sql-log-table' not configured.");
     }
-#if 0
     sqlbox_insert_table = cfg_get(grp, octstr_imm("sql-insert-table"));
     if (sqlbox_insert_table == NULL) {
         panic(0, "No 'sql-insert-table' not configured.");
     }
-#endif
 
     /* create send_sms && sent_sms tables if they do not exist */
-    sql = octstr_format(SQLBOX_MYSQL_CREATE_LOG_TABLE, sqlbox_logtable);
-    sql_update(sql);
-    octstr_destroy(sql);
-#if 0
     sql = octstr_format(SQLBOX_MYSQL_CREATE_INSERT_TABLE, sqlbox_insert_table);
     sql_update(sql);
     octstr_destroy(sql);
-#endif
+    sql = octstr_format(SQLBOX_MYSQL_CREATE_LOG_TABLE, sqlbox_logtable);
+    sql_update(sql);
+    octstr_destroy(sql);
     /* end table creation */
 }
 

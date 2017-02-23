@@ -218,6 +218,8 @@ void pluginbox_cdr_insert_thread(void *arg)
 	return;
     }
     info(0, PLUGINBOX_LOG_PREFIX "Starting insert thread");
+    /* allow for the rest of the plugin chain to start up before sending messages */
+    gwthread_sleep(5.0);
     fetched = gwlist_create();
     gwlist_add_producer(fetched);
     save_list = gwlist_create();

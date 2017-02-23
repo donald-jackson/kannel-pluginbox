@@ -329,6 +329,12 @@ void mysql_save_list(List *qlist, Octstr *momt, int save_mt)
 void mysql_leave()
 {
     dbpool_destroy(pool);
+    if (sqlbox_logtable) {
+	octstr_destroy(sqlbox_logtable);
+    }
+    if (sqlbox_insert_table) {
+	octstr_destroy(sqlbox_insert_table);
+    }
 }
 
 struct server_type *sqlbox_init_mysql(Cfg* cfg)

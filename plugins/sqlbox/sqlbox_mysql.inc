@@ -18,8 +18,6 @@ static Octstr *sqlbox_insert_table;
 
 static DBPool *pool = NULL;
 
-#define SQLBOX_TRACE
-
 static void mysql_update(const Octstr *sql)
 {
     int state;
@@ -91,13 +89,15 @@ void sqlbox_configure_mysql(Cfg* cfg)
     }
     sqlbox_insert_table = cfg_get(grp, octstr_imm("sql-insert-table"));
     if (sqlbox_insert_table == NULL) {
-        panic(0, "No 'sql-insert-table' not configured.");
+        info(0, "No 'sql-insert-table' not configured.");
     }
 
     /* create send_sms && sent_sms tables if they do not exist */
-    sql = octstr_format(SQLBOX_MYSQL_CREATE_INSERT_TABLE, sqlbox_insert_table);
-    sql_update(sql);
-    octstr_destroy(sql);
+    if (sqlbox_insert_table != NULL) {
+    	sql = octstr_format(SQLBOX_MYSQL_CREATE_INSERT_TABLE, sqlbox_insert_table);
+    	sql_update(sql);
+    	octstr_destroy(sql);
+    }
     sql = octstr_format(SQLBOX_MYSQL_CREATE_LOG_TABLE, sqlbox_logtable);
     sql_update(sql);
     octstr_destroy(sql);
@@ -179,6 +179,9 @@ int mysql_fetch_msg_list(List *qlist, long limit)
     MYSQL_ROW row;
     int ret = 0;
 
+    if (sqlbox_insert_table == NULL) {
+	return 0;
+    }
     sql = octstr_format(SQLBOX_MYSQL_SELECT_LIST_QUERY, sqlbox_insert_table, limit);
     res = mysql_select(sql);
     if (res == NULL) {

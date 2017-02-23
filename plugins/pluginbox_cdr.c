@@ -238,7 +238,7 @@ void pluginbox_cdr_insert_thread(void *arg)
                     msg->sms.validity = time(NULL) + msg->sms.validity * 60;
                 if (msg->sms.deferred != SMS_PARAM_UNDEFINED)
                     msg->sms.deferred = time(NULL) + msg->sms.deferred * 60;
-                pluginbox_inject_message(PLUGINBOX_MESSAGE_FROM_SMSBOX, plugin_cdr->id, msg, pluginbox_cdr_injected_callback, context);
+                pluginbox_inject_message(PLUGINBOX_MESSAGE_FROM_SMSBOX, plugin_cdr->id, msg_duplicate(msg), pluginbox_cdr_injected_callback, context);
     
                 if (plugin_cdr->save_mt) {
                     /* convert validity & deferred back to minutes

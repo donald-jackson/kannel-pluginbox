@@ -273,7 +273,7 @@ pssrcs = $(wildcard doc/*.png)
 ps = $(pssrcs:.png=.ps)  
 figsrcs = $(wildcard doc/*.fig)
 figs = $(figsrcs:.fig=.png)  $(figsrcs:.fig=.ps)
-SUBDIRS = gw plugins
+SUBDIRS = gwlib gw plugins
 EXTRA_DIST = KannelLICENSE bootstrap
 all: pb-config pb-config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-recursive

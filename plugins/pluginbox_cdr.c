@@ -60,11 +60,18 @@
 #include "gwlib/gwlib.h"
 #include "gw/pluginbox_plugin.h"
 #include "cdr/cdr_sql.inc"
+#include "gw/sms.h"
+
+#define SLEEP_BETWEEN_EMPTY_SELECTS 1.0
 
 typedef struct {
 	Octstr *id;
+	Octstr *global_sender;
 	int save_mo, save_mt, save_dlr;
 	DBPool *pool;
+	long insert_thread;
+	long limit_per_cycle;
+	volatile int running;
 } PluginCdr;
 
 #define PLUGINBOX_LOG_PREFIX "[CDR-PLUGIN] "
@@ -81,6 +88,7 @@ void pluginbox_cdr_plugin_destroy(PluginCdr *plugin_cdr) {
     if (plugin_cdr->pool) {
 	db_shutdown(plugin_cdr->pool);
     }
+    if (plugin_cdr->global_sender) octstr_destroy(plugin_cdr->global_sender);
     gw_free(plugin_cdr);
 }
 
@@ -134,6 +142,12 @@ void pluginbox_cdr_configure(PluginCdr *plugin_cdr, Cfg *cfg)
     CfgGroup *grp;
 
     grp = cfg_get_single_group(cfg, octstr_imm("sqlbox"));
+
+    if (cfg_get_integer(&plugin_cdr->limit_per_cycle, grp, octstr_imm("limit-per-cycle")) == -1) {
+        plugin_cdr->limit_per_cycle = 0;
+	info(0, PLUGINBOX_LOG_PREFIX "No limit-per-cycle configured. Disabling send thread.");
+    }
+
     /* set up save parameters */
     if (cfg_get_bool(&plugin_cdr->save_mo, grp, octstr_imm("save-mo")) == -1)
         plugin_cdr->save_mo = 1;
@@ -148,11 +162,121 @@ void pluginbox_cdr_configure(PluginCdr *plugin_cdr, Cfg *cfg)
 	panic(0, "No db-id set in configuration file.");
     }
     plugin_cdr->pool = db_init_shared(cfg, db_id);
+    plugin_cdr->global_sender = cfg_get(grp, octstr_imm("global-sender"));
+}
+
+void pluginbox_cdr_injected_callback(ack_status_t ack_status, void *context) {
+}
+
+/****************************************************************************
+ * Character convertion.
+ * 
+ * The 'msgdata' is read from the DB table as URL-encoded byte stream, 
+ * which we need to URL-decode to get the orginal message. We use this
+ * approach to get rid of the table character dependancy of the DB systems.
+ * The URL-encoded chars as a subset of ASCII which is typicall no problem
+ * for any of the supported DB systems.
+ */
+
+static int charset_processing(Msg *msg) 
+{
+    gw_assert(msg->type == sms);
+
+    /* URL-decode first */
+    if (octstr_url_decode(msg->sms.msgdata) == -1)
+        return -1;
+    if (octstr_url_decode(msg->sms.udhdata) == -1)
+        return -1;
+        
+    /* If a specific character encoding has been indicated by the
+     * user, then make sure we convert to our internal representations. */
+    if (octstr_len(msg->sms.charset)) {
+    
+        if (msg->sms.coding == DC_7BIT) {
+            /* For 7 bit, convert to UTF-8 */
+            if (charset_convert(msg->sms.msgdata, octstr_get_cstr(msg->sms.charset), "UTF-8") < 0)
+                return -1;
+        } 
+        else if (msg->sms.coding == DC_UCS2) {
+            /* For UCS-2, convert to UTF-16BE */
+            if (charset_convert(msg->sms.msgdata, octstr_get_cstr(msg->sms.charset), "UTF-16BE") < 0) 
+                return -1;
+        }
+    }
+    
+    return 0;
+}
+
+
+void pluginbox_cdr_insert_thread(void *arg)
+{
+    PluginCdr *plugin_cdr = arg;
+    PluginBoxMsg *pluginbox_msg;
+    List *fetched, *save_list;
+    Msg *msg;
+    int consumed;
+    void *context = NULL;
+
+    if (0 == plugin_cdr->limit_per_cycle) {
+	return;
+    }
+    info(0, PLUGINBOX_LOG_PREFIX "Starting insert thread");
+    /* allow for the rest of the plugin chain to start up before sending messages */
+    gwthread_sleep(5.0);
+    fetched = gwlist_create();
+    gwlist_add_producer(fetched);
+    save_list = gwlist_create();
+    gwlist_add_producer(save_list);
+    while (plugin_cdr->running) {
+	if ( plugin_cdr->backend->sql_fetch_msg_list(fetched, plugin_cdr->limit_per_cycle) > 0 ) {
+	    while((gwlist_len(fetched)>0) && ((msg = gwlist_consume(fetched)) != NULL )) {
+                if (charset_processing(msg) == -1) {
+                    error(0, "Could not charset process message, dropping it!");
+                    msg_destroy(msg);
+                    continue;
+                }
+                if (plugin_cdr->global_sender != NULL && (msg->sms.sender == NULL || octstr_len(msg->sms.sender) == 0)) {
+                    msg->sms.sender = octstr_duplicate(plugin_cdr->global_sender);
+                }
+                /* convert validity and deferred to unix timestamp */
+                if (msg->sms.validity != SMS_PARAM_UNDEFINED)
+                    msg->sms.validity = time(NULL) + msg->sms.validity * 60;
+                if (msg->sms.deferred != SMS_PARAM_UNDEFINED)
+                    msg->sms.deferred = time(NULL) + msg->sms.deferred * 60;
+                pluginbox_inject_message(PLUGINBOX_MESSAGE_FROM_SMSBOX, plugin_cdr->id, msg_duplicate(msg), pluginbox_cdr_injected_callback, context);
+    
+                if (plugin_cdr->save_mt) {
+                    /* convert validity & deferred back to minutes
+                    * TODO clarify why we fetched message from DB and then insert it back here???
+                    */
+                    if (msg->sms.validity != SMS_PARAM_UNDEFINED)
+                        msg->sms.validity = (msg->sms.validity - time(NULL))/60;
+                    if (msg->sms.deferred != SMS_PARAM_UNDEFINED)
+                        msg->sms.deferred = (msg->sms.deferred - time(NULL))/60;
+
+	            plugin_cdr->backend->sql_save_msg(msg, octstr_imm("MT"));
+                }
+		gwlist_produce(save_list, msg);
+	    }
+	    plugin_cdr->backend->sql_save_list(save_list, octstr_imm("MT"), plugin_cdr->save_mt);
+        }
+        else {
+            gwthread_sleep(SLEEP_BETWEEN_EMPTY_SELECTS);
+        }
+    }
+    info(0, PLUGINBOX_LOG_PREFIX "Stopping insert thread");
+    gwlist_remove_producer(fetched);
+    gwlist_remove_producer(save_list);
+    gwlist_destroy(fetched, msg_destroy_item);
+    gwlist_destroy(save_list, msg_destroy_item);
+>>>>>>> insertmo
 }
 
 void pluginbox_cdr_shutdown(PluginBoxPlugin *pluginbox_plugin) {
     PluginCdr *plugin_cdr = pluginbox_plugin->context;
 
+    plugin_cdr->running = 0;
+    gwthread_join(plugin_cdr->insert_thread);
     pluginbox_cdr_plugin_destroy(plugin_cdr);
     info(0, PLUGINBOX_LOG_PREFIX "Shutdown complete");
 }
@@ -240,6 +364,8 @@ int pluginbox_cdr_init(PluginBoxPlugin *pluginbox_plugin) {
 	pluginbox_plugin->process = pluginbox_cdr_process;
 	pluginbox_plugin->shutdown = pluginbox_cdr_shutdown;
 	pluginbox_plugin->status = pluginbox_cdr_status;
+	((PluginCdr *)pluginbox_plugin->context)->running = 1;
+	((PluginCdr *)pluginbox_plugin->context)->insert_thread = gwthread_create(pluginbox_cdr_insert_thread, pluginbox_plugin->context);
 	return 1;
 }
 

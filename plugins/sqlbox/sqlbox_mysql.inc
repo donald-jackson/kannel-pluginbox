@@ -34,11 +34,12 @@ static void mysql_update(const Octstr *sql)
     }
 
     state = mysql_query(pc->conn, octstr_get_cstr(sql));
-    if (state != 0)
+    if (state != 0) {
         error(0, "MYSQL: %s", mysql_error(pc->conn));
         if (mysql_errno(pc->conn) == MYSQL_ERR_NOSUCHFIELD) {
             error(0, "Try to recreate insert and log tables. The structure may have changed. See ChangeLog.");
         }
+    }
 
     dbpool_conn_produce(pc);
 }
@@ -86,22 +87,20 @@ void sqlbox_configure_mysql(Cfg* cfg)
     if (sqlbox_logtable == NULL) {
         panic(0, "No 'sql-log-table' not configured.");
     }
-#if 0
     sqlbox_insert_table = cfg_get(grp, octstr_imm("sql-insert-table"));
     if (sqlbox_insert_table == NULL) {
-        panic(0, "No 'sql-insert-table' not configured.");
+        info(0, "No 'sql-insert-table' not configured.");
     }
-#endif
 
     /* create send_sms && sent_sms tables if they do not exist */
+    if (sqlbox_insert_table != NULL) {
+    	sql = octstr_format(SQLBOX_MYSQL_CREATE_INSERT_TABLE, sqlbox_insert_table);
+    	sql_update(sql);
+    	octstr_destroy(sql);
+    }
     sql = octstr_format(SQLBOX_MYSQL_CREATE_LOG_TABLE, sqlbox_logtable);
     sql_update(sql);
     octstr_destroy(sql);
-#if 0
-    sql = octstr_format(SQLBOX_MYSQL_CREATE_INSERT_TABLE, sqlbox_insert_table);
-    sql_update(sql);
-    octstr_destroy(sql);
-#endif
     /* end table creation */
 }
 
@@ -180,6 +179,9 @@ int mysql_fetch_msg_list(List *qlist, long limit)
     MYSQL_ROW row;
     int ret = 0;
 
+    if (sqlbox_insert_table == NULL) {
+	return 0;
+    }
     sql = octstr_format(SQLBOX_MYSQL_SELECT_LIST_QUERY, sqlbox_insert_table, limit);
     res = mysql_select(sql);
     if (res == NULL) {
@@ -327,6 +329,12 @@ void mysql_save_list(List *qlist, Octstr *momt, int save_mt)
 void mysql_leave()
 {
     dbpool_destroy(pool);
+    if (sqlbox_logtable) {
+	octstr_destroy(sqlbox_logtable);
+    }
+    if (sqlbox_insert_table) {
+	octstr_destroy(sqlbox_insert_table);
+    }
 }
 
 struct server_type *sqlbox_init_mysql(Cfg* cfg)

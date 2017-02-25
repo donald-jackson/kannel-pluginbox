@@ -158,21 +158,27 @@ void db_shutdown(DBPool *pool)
 	SharedPool *s_pool;
 	int i;
 	Octstr *key;
+
+	/* check if this pool was one ouf of a shared pool */
 	if (NULL != shared_pools) {
 		keys = dict_keys(shared_pools);
 		for (i = 0; i < gwlist_len(keys); i++) {
 			key = gwlist_get(keys, i);
 			s_pool = dict_get(shared_pools, key);
-			if (NULL != s_pool) {
+			if (NULL != s_pool && s_pool->pool == pool) {
 				if ((--(s_pool->count)) > 0) {
 					return;
 				}
 				dict_put(shared_pools, key, NULL);
+				/* destroy the dict if not needed anymore */
+				if (dict_key_count(shared_pools) == 0) {
+					dict_destroy(shared_pools);
+					shared_pools = NULL;
+				}
 				return;
 			}
 		}
 	}
-	/* todo: check if member of shared_pools */
 	dbpool_destroy(pool);
 }
 

@@ -70,17 +70,42 @@
 #include "gwlib/dbpool.h"
 #include "gwlib/dbpool_p.h"
 
+/* db_init initialized a database connection pool from the config with given id 'config_id'.
+   all available database types are tried, until a suitable config is found. */
 DBPool *db_init(Cfg *cfg, Octstr *config_id);
+
+/* db_init_shared also initializes a database connection pool, but returns a previously found pointer,
+   in case a given database is already initialized before. This allows for different plugins to use
+   a common database pool. */
 DBPool *db_init_shared(Cfg *cfg, Octstr *config_id);
+
+/* db_shutdown destroys a database pool or decreases it's counter in case it is a shared pool */
 void db_shutdown(DBPool *pool);
+
+/* db_fetch_pivot executes an sql query and returns the first field of the first record as an Octstr */
 Octstr *db_fetch_pivot (DBPool *pool, Octstr *query, List *binds);
+
+/* db_fetch_list returns a record set as a list-of-fields of a list-of-records */
 List *db_fetch_list (DBPool *pool, Octstr *query, List *binds);
+
+/* db_fetch_record returns the first record of a given query as a list-of-fields */
 List *db_fetch_record (DBPool *pool, Octstr *query, List *binds);
+
+/* db_fetch_dict returns a dictionary made of result set records. The dict key is the primary key.
+   The primary key should be the first field selected in the select query. */
 Dict *db_fetch_dict (DBPool *pool, Octstr *query, List *binds);
+
+/* db_update exexcutes an sql query that doesn't return a record set (e.g. update/insert/delete). */
 int db_update(DBPool *pool, Octstr *query, List *binds);
+
+/* db_get_field_at returns the field at fieldindex of the record at index as an Octstr */
 Octstr *db_get_field_at(List *table, int fieldindex, int index);
+
+/* db_get_record returns the record as a list-of-fields at the given result set "index" */
 List *db_get_record(List *table, int index);
+
+/* db_table_destroy_item can be used to destroy a table, returned by db_fetch_list .
+   Example: gwlist_destroy(table, db_table_destroy_item); */
 void db_table_destroy_item(void *ptr);
-void db_dict_destroy_item(void *ptr);
 
 #endif

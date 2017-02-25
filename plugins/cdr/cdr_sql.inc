@@ -65,9 +65,8 @@
 
 #define SQLBOX_MYSQL_SELECT_LIST_QUERY "SELECT sql_id, momt%s FROM %S LIMIT 0,%ld"
 
-#define SQLBOX_MYSQL_INSERT_QUERY "INSERT INTO %S ( momt%s, sql_id) VALUES ( \
-%S, %S, %S, %S, %S, %S, %S, %S, %S, %S, %S, %S, %S, %S, %S, %S, \
-%S, %S, %S, %S, %S, %S, %S, %S, %S, %S, %S, NULL)"
+#define SQLBOX_MYSQL_INSERT_QUERY "INSERT INTO %s ( momt%s, sql_id) VALUES ( \
+?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)"
 
 #define SQLBOX_MYSQL_DELETE_QUERY "DELETE FROM %S WHERE sql_id = %S"
 
@@ -125,7 +124,7 @@ static void sql_save_msg(DBPool *pool, Msg *msg, Octstr *momt, Octstr *sql_logta
 #undef UUID
 #undef VOID
     fields = msg_fields();
-    sql = octstr_format(SQLBOX_MYSQL_INSERT_QUERY, octstr_get_cstr(fields), sql_logtable);
+    sql = octstr_format(SQLBOX_MYSQL_INSERT_QUERY, octstr_get_cstr(sql_logtable), octstr_get_cstr(fields));
     octstr_destroy(fields);
     db_update(pool, sql, binds);
     octstr_destroy(sql);
@@ -147,11 +146,11 @@ static void sql_save_list(DBPool *pool, List *qlist, Octstr *momt, int save_mt, 
 
 static Msg *record_to_msg(List *record)
 {
-	int fcnt = 1; /* skip id field */
+	int fcnt = 2; /* skip sql_id & momt fields */
 	Msg *msg = msg_create(sms);
-#define INTEGER(name) p->name = atoi(gwlist_get(record, fcnt++));
-#define OCTSTR(name) p->name = octstr_duplicate(gwlist_get(record, fcnt++));
-#define UUID(name) uuid_parse(gwlist_get(record, fcnt++), p->name);
+#define INTEGER(name) { Octstr *f = gwlist_get(record, fcnt++); p->name = (f && octstr_len(f) > 0) ? atoi(octstr_get_cstr(f)) : SMS_PARAM_UNDEFINED; }
+#define OCTSTR(name) { Octstr *f = gwlist_get(record, fcnt++); p->name = (f && octstr_len(f) > 0) ? octstr_duplicate(f) : NULL; }
+#define UUID(name) uuid_parse(octstr_get_cstr(gwlist_get(record, fcnt++)), p->name);
 #define VOID(name) /**/
 #define MSG(type, stmt) { if (type == sms) { struct type *p = &msg->type; stmt } }
 #include "gw/msg-decl.h"
@@ -159,6 +158,17 @@ static Msg *record_to_msg(List *record)
 #undef INTEGER
 #undef UUID
 #undef VOID
+	msg_dump(msg, 0);
+	return msg;
+}
+
+static void sql_delete(DBPool *pool, Octstr *sql_insert_table, Octstr *id)
+{
+	Octstr *sql;
+
+	sql = octstr_format(SQLBOX_MYSQL_DELETE_QUERY, sql_insert_table, id);
+	db_update(pool, sql, NULL);
+	octstr_destroy(sql);
 }
 
 static Msg *sql_fetch_msg(DBPool *pool, Octstr *sql_insert_table)

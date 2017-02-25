@@ -96,9 +96,6 @@ Octstr *pluginbox_id;
 /* our status */
 volatile sig_atomic_t plugin_status;
 
-#define SLEEP_BETWEEN_EMPTY_SELECTS 1.0
-#define DEFAULT_LIMIT_PER_CYCLE 10
-
 typedef struct _boxc {
     Connection *smsbox_connection;
     Connection *bearerbox_connection;

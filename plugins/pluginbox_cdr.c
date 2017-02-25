@@ -178,6 +178,9 @@ void pluginbox_cdr_configure(PluginCdr *plugin_cdr, Cfg *cfg)
 }
 
 void pluginbox_cdr_injected_callback(ack_status_t ack_status, void *context) {
+	Octstr *id = (Octstr *)context;
+	/* here we need to sql_delete the message */
+	octstr_destroy(id);
 }
 
 /****************************************************************************
@@ -194,15 +197,18 @@ static int charset_processing(Msg *msg)
 {
     gw_assert(msg->type == sms);
 
+	/* TODO: re-enable */
+#if 0
     /* URL-decode first */
     if (octstr_url_decode(msg->sms.msgdata) == -1)
         return -1;
     if (octstr_url_decode(msg->sms.udhdata) == -1)
         return -1;
+#endif
         
     /* If a specific character encoding has been indicated by the
      * user, then make sure we convert to our internal representations. */
-    if (octstr_len(msg->sms.charset)) {
+    if (msg->sms.charset && octstr_len(msg->sms.charset)) {
     
         if (msg->sms.coding == DC_7BIT) {
             /* For 7 bit, convert to UTF-8 */
@@ -251,14 +257,17 @@ void pluginbox_cdr_insert_thread(void *arg)
                 if (plugin_cdr->id != NULL && (msg->sms.boxc_id == NULL || octstr_len(msg->sms.boxc_id) == 0)) {
                     msg->sms.boxc_id = octstr_duplicate(plugin_cdr->id);
                 }
+#if 0
                 /* convert validity and deferred to unix timestamp */
                 if (msg->sms.validity != SMS_PARAM_UNDEFINED)
                     msg->sms.validity = time(NULL) + msg->sms.validity * 60;
                 if (msg->sms.deferred != SMS_PARAM_UNDEFINED)
                     msg->sms.deferred = time(NULL) + msg->sms.deferred * 60;
-                pluginbox_inject_message(PLUGINBOX_MESSAGE_FROM_SMSBOX, plugin_cdr->id, msg_duplicate(msg), pluginbox_cdr_injected_callback, (void *)msg->sms.foreign_id);
+#endif
+                pluginbox_inject_message(PLUGINBOX_MESSAGE_FROM_SMSBOX, plugin_cdr->id, msg_duplicate(msg), pluginbox_cdr_injected_callback, (void *)octstr_duplicate(msg->sms.foreign_id));
     
                 if (plugin_cdr->save_mt) {
+#if 0
                     /* convert validity & deferred back to minutes
                     * TODO clarify why we fetched message from DB and then insert it back here???
                     */
@@ -266,8 +275,9 @@ void pluginbox_cdr_insert_thread(void *arg)
                         msg->sms.validity = (msg->sms.validity - time(NULL))/60;
                     if (msg->sms.deferred != SMS_PARAM_UNDEFINED)
                         msg->sms.deferred = (msg->sms.deferred - time(NULL))/60;
-
+#endif
 	            sql_save_msg(plugin_cdr->pool, msg, octstr_imm("MT"), plugin_cdr->logtable);
+		    msg_destroy(msg);
                 }
 	    }
         }
@@ -294,7 +304,7 @@ void pluginbox_cdr_process(PluginBoxPlugin *pluginbox_plugin, PluginBoxMsg *plug
     Msg *msg_escaped;
 
     if (msg_type(pluginbox_msg->msg) == sms) {
-	debug("pluginbox.http.process", 0, PLUGINBOX_LOG_PREFIX "Got plugin message chain %ld", pluginbox_msg->chain);
+	debug("pluginbox.cdr.process", 0, PLUGINBOX_LOG_PREFIX "Got plugin message chain %ld", pluginbox_msg->chain);
 	plugin_cdr = (PluginCdr *)pluginbox_plugin->context;
 	msg_escaped = msg_duplicate(pluginbox_msg->msg);
         switch (pluginbox_msg->msg->sms.sms_type) {

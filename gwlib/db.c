@@ -168,6 +168,22 @@ List *db_fetch_list (DBPool *pool, Octstr *query, List *binds)
 	return result;
 }
 
+List *db_fetch_record (DBPool *pool, Octstr *query, List *binds)
+{
+	List *table = db_fetch_list(pool, query, binds);
+	List *result;
+	if (NULL == table) {
+		return NULL;
+	}
+	if (gwlist_len(table) < 1) {
+		return NULL;
+	}
+	result = gwlist_get(table, 0);
+	gwlist_delete(table, 0, 1);
+	db_table_destroy_item(table);
+	return result;
+}
+
 Dict *db_fetch_dict (DBPool *pool, Octstr *query, List *binds)
 {
 	List *table = db_fetch_list(pool, query, binds);
@@ -185,12 +201,12 @@ Dict *db_fetch_dict (DBPool *pool, Octstr *query, List *binds)
 	return result;
 }
 
-void db_update(DBPool *pool, Octstr *query)
+void db_update(DBPool *pool, Octstr *query, List *binds)
 {
 	if (NULL == pool->db_ops->update) {
 		panic(0, "sql_update not implemented for this database type.");
 	}
-	pool->db_ops->update(pool, query, NULL);
+	pool->db_ops->update(pool, query, binds);
 }
 
 List *db_get_record(List *table, int index)

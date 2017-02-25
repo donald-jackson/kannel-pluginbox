@@ -60,7 +60,6 @@
 #include "gwlib/gwlib.h"
 #include "gw/pluginbox_plugin.h"
 #include "cdr/cdr_sql.inc"
-#include "gw/sms.h"
 
 #define SLEEP_BETWEEN_EMPTY_SELECTS 1.0
 
@@ -71,6 +70,8 @@ typedef struct {
 	DBPool *pool;
 	long insert_thread;
 	long limit_per_cycle;
+	Octstr *logtable;
+	Octstr * inserttable;
 	volatile int running;
 } PluginCdr;
 
@@ -140,6 +141,7 @@ static int sqlbox_is_single_group(Octstr *query)
 void pluginbox_cdr_configure(PluginCdr *plugin_cdr, Cfg *cfg)
 {
     CfgGroup *grp;
+    Octstr *db_id;
 
     grp = cfg_get_single_group(cfg, octstr_imm("sqlbox"));
 
@@ -158,11 +160,12 @@ void pluginbox_cdr_configure(PluginCdr *plugin_cdr, Cfg *cfg)
     if (cfg_get_bool(&plugin_cdr->save_dlr, grp, octstr_imm("save-dlr")) == -1)
         plugin_cdr->save_dlr = 1;
 
-    if (NULL == (db_id = cfg_get(grp, "db-id"))) {
+    if (NULL == (db_id = cfg_get(grp, db_id))) {
 	panic(0, "No db-id set in configuration file.");
     }
     plugin_cdr->pool = db_init_shared(cfg, db_id);
     plugin_cdr->global_sender = cfg_get(grp, octstr_imm("global-sender"));
+    octstr_destroy(db_id);
 }
 
 void pluginbox_cdr_injected_callback(ack_status_t ack_status, void *context) {
@@ -228,7 +231,7 @@ void pluginbox_cdr_insert_thread(void *arg)
     save_list = gwlist_create();
     gwlist_add_producer(save_list);
     while (plugin_cdr->running) {
-	if ( plugin_cdr->backend->sql_fetch_msg_list(fetched, plugin_cdr->limit_per_cycle) > 0 ) {
+	if ( sql_fetch_msg_list(plugin_cdr->pool, fetched, plugin_cdr->limit_per_cycle, plugin_cdr->inserttable) > 0 ) {
 	    while((gwlist_len(fetched)>0) && ((msg = gwlist_consume(fetched)) != NULL )) {
                 if (charset_processing(msg) == -1) {
                     error(0, "Could not charset process message, dropping it!");
@@ -254,11 +257,11 @@ void pluginbox_cdr_insert_thread(void *arg)
                     if (msg->sms.deferred != SMS_PARAM_UNDEFINED)
                         msg->sms.deferred = (msg->sms.deferred - time(NULL))/60;
 
-	            plugin_cdr->backend->sql_save_msg(msg, octstr_imm("MT"));
+	            sql_save_msg(plugin_cdr->pool, msg, octstr_imm("MT"), plugin_cdr->logtable);
                 }
 		gwlist_produce(save_list, msg);
 	    }
-	    plugin_cdr->backend->sql_save_list(save_list, octstr_imm("MT"), plugin_cdr->save_mt);
+	    sql_save_list(plugin_cdr->pool, save_list, octstr_imm("MT"), plugin_cdr->save_mt, plugin_cdr->logtable);
         }
         else {
             gwthread_sleep(SLEEP_BETWEEN_EMPTY_SELECTS);
@@ -269,7 +272,6 @@ void pluginbox_cdr_insert_thread(void *arg)
     gwlist_remove_producer(save_list);
     gwlist_destroy(fetched, msg_destroy_item);
     gwlist_destroy(save_list, msg_destroy_item);
->>>>>>> insertmo
 }
 
 void pluginbox_cdr_shutdown(PluginBoxPlugin *pluginbox_plugin) {
@@ -292,18 +294,18 @@ void pluginbox_cdr_process(PluginBoxPlugin *pluginbox_plugin, PluginBoxMsg *plug
         switch (pluginbox_msg->msg->sms.sms_type) {
 	case report_mo:
 	    if (plugin_cdr->save_dlr) {
-	        sql_save_msg(msg_escaped, octstr_imm("DLR"));
+	        sql_save_msg(plugin_cdr->pool, msg_escaped, octstr_imm("DLR"), plugin_cdr->logtable);
 	    }
 	    break;
 	case mo:
 	    if (plugin_cdr->save_mo) {
-	        sql_save_msg(msg_escaped, octstr_imm("MO"));
+	        sql_save_msg(plugin_cdr->pool, msg_escaped, octstr_imm("MO"), plugin_cdr->logtable);
 	    }
 	    break;
 	case mt_reply:
 	case mt_push:
 	    if (plugin_cdr->save_mt) {
-	        sql_save_msg(msg_escaped, octstr_imm("MT"));
+	        sql_save_msg(plugin_cdr->pool, msg_escaped, octstr_imm("MT"), plugin_cdr->logtable);
 	    }
 	    break;
 	}
@@ -367,14 +369,4 @@ int pluginbox_cdr_init(PluginBoxPlugin *pluginbox_plugin) {
 	((PluginCdr *)pluginbox_plugin->context)->running = 1;
 	((PluginCdr *)pluginbox_plugin->context)->insert_thread = gwthread_create(pluginbox_cdr_insert_thread, pluginbox_plugin->context);
 	return 1;
-}
-
-static char *type_as_str(Msg *msg)
-{
-    switch (msg->type) {
-#define MSG(t, stmt) case t: return #t;
-#include "gw/msg-decl.h"
-        default:
-            return "unknown type";
-    }
 }

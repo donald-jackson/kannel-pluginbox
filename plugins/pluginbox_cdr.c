@@ -59,13 +59,12 @@
 
 #include "gwlib/gwlib.h"
 #include "gw/pluginbox_plugin.h"
-#include "sqlbox/sqlbox_sql.inc"
-#include "sqlbox/sqlbox_mysql.inc"
+#include "cdr/cdr_sql.inc"
 
 typedef struct {
 	Octstr *id;
 	int save_mo, save_mt, save_dlr;
-	struct server_type *backend;
+	DBPool *pool;
 } PluginCdr;
 
 #define PLUGINBOX_LOG_PREFIX "[CDR-PLUGIN] "
@@ -73,14 +72,14 @@ typedef struct {
 PluginCdr *pluginbox_cdr_plugin_create() {
     PluginCdr *plugin_cdr = gw_malloc(sizeof(PluginCdr));
     plugin_cdr->id = NULL;
-    plugin_cdr->backend = NULL;
+    plugin_cdr->pool = NULL;
     return plugin_cdr;
 }
 
 void pluginbox_cdr_plugin_destroy(PluginCdr *plugin_cdr) {
     if (plugin_cdr->id) octstr_destroy(plugin_cdr->id);
-    if (plugin_cdr->backend && plugin_cdr->backend->sql_leave) {
-	plugin_cdr->backend->sql_leave();
+    if (plugin_cdr->pool) {
+	db_shutdown(plugin_cdr->pool);
     }
     gw_free(plugin_cdr);
 }
@@ -144,6 +143,11 @@ void pluginbox_cdr_configure(PluginCdr *plugin_cdr, Cfg *cfg)
 
     if (cfg_get_bool(&plugin_cdr->save_dlr, grp, octstr_imm("save-dlr")) == -1)
         plugin_cdr->save_dlr = 1;
+
+    if (NULL == (db_id = cfg_get(grp, "db-id"))) {
+	panic(0, "No db-id set in configuration file.");
+    }
+    plugin_cdr->pool = db_init_shared(cfg, db_id);
 }
 
 void pluginbox_cdr_shutdown(PluginBoxPlugin *pluginbox_plugin) {
@@ -164,18 +168,18 @@ void pluginbox_cdr_process(PluginBoxPlugin *pluginbox_plugin, PluginBoxMsg *plug
         switch (pluginbox_msg->msg->sms.sms_type) {
 	case report_mo:
 	    if (plugin_cdr->save_dlr) {
-	        plugin_cdr->backend->sql_save_msg(msg_escaped, octstr_imm("DLR"));
+	        sql_save_msg(msg_escaped, octstr_imm("DLR"));
 	    }
 	    break;
 	case mo:
 	    if (plugin_cdr->save_mo) {
-	        plugin_cdr->backend->sql_save_msg(msg_escaped, octstr_imm("MO"));
+	        sql_save_msg(msg_escaped, octstr_imm("MO"));
 	    }
 	    break;
 	case mt_reply:
 	case mt_push:
 	    if (plugin_cdr->save_mt) {
-	        plugin_cdr->backend->sql_save_msg(msg_escaped, octstr_imm("MT"));
+	        sql_save_msg(msg_escaped, octstr_imm("MT"));
 	    }
 	    break;
 	}
@@ -231,8 +235,6 @@ int pluginbox_cdr_init(PluginBoxPlugin *pluginbox_plugin) {
 	}
 	pluginbox_plugin->context = pluginbox_cdr_plugin_create();
 	pluginbox_cdr_configure(pluginbox_plugin->context, cfg);
-	((PluginCdr *)pluginbox_plugin->context)->backend = sqlbox_init_sql(cfg);
-	((PluginCdr *)pluginbox_plugin->context)->backend->sql_enter(cfg);
 	cfg_destroy(cfg);
 	pluginbox_plugin->direction = PLUGINBOX_MESSAGE_FROM_SMSBOX | PLUGINBOX_MESSAGE_FROM_BEARERBOX;
 	pluginbox_plugin->process = pluginbox_cdr_process;

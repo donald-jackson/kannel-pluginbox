@@ -59,13 +59,18 @@
 
 /*
 	Attempt at generic Kannel database support.
-	Currently only mysql is supported.
 */
 
 
 #include "gwlib/gwlib.h"
 #include "db.h"
 #include "db_mysql.h"
+#include "db_mssql.h"
+#include "db_oracle.h"
+#include "db_pgsql.h"
+#include "db_sdb.h"
+#include "db_sqlite.h"
+#include "db_sqlite3.h"
 
 #define DB_TRACE
 
@@ -78,16 +83,54 @@ static Dict *shared_pools = NULL;
 
 DBPool *db_init(Cfg *cfg, Octstr *config_id)
 {
-	DBPool *result;
+    DBPool *res;
 
-	result = db_init_mysql(cfg, config_id);
-	if (NULL == result) {
-		// todo: other sql engines
-	}
-	if (NULL == result) {
-		panic(0, "No connnection found with id %s", octstr_get_cstr(config_id));
-	}
-	return result;
+#ifdef HAVE_MYSQL
+    res = db_init_mysql(cfg, config_id);
+    if (res) {
+        return res;
+    }
+#endif
+#ifdef HAVE_MSSQL
+    res = db_init_mssql(cfg, config_id);
+    if (res) {
+        return res;
+    }
+#endif
+#ifdef HAVE_ORACLE
+    res = db_init_oracle(cfg, config_id);
+    if (res) {
+        return res;
+    }
+#endif
+#ifdef HAVE_PGSQL
+    res = db_init_pgsql(cfg, config_id);
+    if (res) {
+        return res;
+    }
+#endif
+#ifdef HAVE_SDB
+    res = db_init_sdb(cfg, config_id);
+    if (res) {
+        return res;
+    }
+#endif
+#ifdef HAVE_SQLITE
+    res = db_init_sqlite(cfg, config_id);
+    if (res) {
+        return res;
+    }
+#endif
+#ifdef HAVE_SQLITE3
+    res = db_init_sqlite3(cfg, config_id);
+    if (res) {
+        return res;
+    }
+#endif
+    if (NULL == res) {
+	panic(0, "No connnection found with id %s", octstr_get_cstr(config_id));
+    }
+    return res;
 }
 
 DBPool *db_init_shared(Cfg *cfg, Octstr *config_id)

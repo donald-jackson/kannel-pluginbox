@@ -65,83 +65,65 @@
 #include "gwlib/gwlib.h"
 #include "db.h"
 
-#include "db_mysql.h"
+#include "db_sdb.h"
 
-DBPool *db_init_mysql(Cfg *cfg, Octstr *config_id) {
+DBPool *sqlbox_init_sdb(Cfg* cfg, Octstr *config_id)
+{
     CfgGroup *grp;
     List *grplist;
-    Octstr *mysql_host, *mysql_user, *mysql_pass, *mysql_db;
+    Octstr *sdb_url;
     Octstr *p = NULL;
-    long pool_size, mysql_port;
-    int have_port;
+    long pool_size;
     DBConf *db_conf = NULL;
     DBPool *pool;
 
     /*
-     * now grap the required information from the 'mysql-connection' group
-     * with the mysql-id we just obtained
+     * now grap the required information from the 'sdb-connection' group
+     * with the sdb-id we just obtained
      *
-     * we have to loop through all available MySQL connection definitions
+     * we have to loop through all available Sdb connection definitions
      * and search for the one we are looking for
      */
 
-    grplist = cfg_get_multi_group(cfg, octstr_imm("mysql-connection"));
-    while (grplist && (grp = (CfgGroup *)gwlist_extract_first(grplist)) != NULL) {
-         p = cfg_get(grp, octstr_imm("id"));
-         if (p != NULL && octstr_compare(p, config_id) == 0) {
-             break;
-         }
-         if (p != NULL) octstr_destroy(p);
-    }
-    if (NULL == p) {
-	return NULL;
-    }
+     grplist = cfg_get_multi_group(cfg, octstr_imm("sdb-connection"));
+     while (grplist && (grp = (CfgGroup *)gwlist_extract_first(grplist)) != NULL) {
+        p = cfg_get(grp, octstr_imm("id"));
+        if (p != NULL && octstr_compare(p, config_id) == 0) {
+            goto found;
+        }
+        if (p != NULL) octstr_destroy(p);
+     }
+     return NULL;
 
+found:
     octstr_destroy(p);
     gwlist_destroy(grplist, NULL);
 
     if (cfg_get_integer(&pool_size, grp, octstr_imm("max-connections")) == -1 || pool_size == 0)
         pool_size = 1;
 
-    if (!(mysql_host = cfg_get(grp, octstr_imm("host"))))
-        panic(0, "SQLBOX: MySQL: directive 'host' is not specified!");
-    if (!(mysql_user = cfg_get(grp, octstr_imm("username"))))
-        panic(0, "SQLBOX: MySQL: directive 'username' is not specified!");
-    if (!(mysql_pass = cfg_get(grp, octstr_imm("password"))))
-        panic(0, "SQLBOX: MySQL: directive 'password' is not specified!");
-    if (!(mysql_db = cfg_get(grp, octstr_imm("database"))))
-        panic(0, "SQLBOX: MySQL: directive 'database' is not specified!");
-    have_port = (cfg_get_integer(&mysql_port, grp, octstr_imm("port")) != -1);
+    if (!(sdb_url = cfg_get(grp, octstr_imm("url"))))
+            panic(0, "SQLBOX: SDB: directive 'url' is not specified!");
 
     /*
-     * ok, ready to connect to MySQL
+     * ok, ready to connect to Sdb
      */
     db_conf = gw_malloc(sizeof(DBConf));
     gw_assert(db_conf != NULL);
 
-    db_conf->mysql = gw_malloc(sizeof(MySQLConf));
-    gw_assert(db_conf->mysql != NULL);
+    db_conf->sdb = gw_malloc(sizeof(SDBConf));
+    gw_assert(db_conf->sdb != NULL);
 
-    db_conf->mysql->host = mysql_host;
-    db_conf->mysql->username = mysql_user;
-    db_conf->mysql->password = mysql_pass;
-    db_conf->mysql->database = mysql_db;
-    if (have_port) {
-        db_conf->mysql->port = mysql_port;
-    }
-    else {
-        db_conf->mysql->port = 3306;
-    }
+    db_conf->sdb->url = sdb_url;
 
-    pool = dbpool_create(DBPOOL_MYSQL, db_conf, pool_size);
+    pool = dbpool_create(DBPOOL_SDB, db_conf, pool_size);
     gw_assert(pool != NULL);
 
     /*
      * XXX should a failing connect throw panic?!
      */
     if (dbpool_conn_count(pool) == 0)
-        panic(0,"SQLBOX: MySQL: database pool has no connections!");
+        panic(0,"SQLBOX: Sdb: database pool has no connections!");
 
     return pool;
 }
-

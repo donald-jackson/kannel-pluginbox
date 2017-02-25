@@ -116,7 +116,7 @@ static int sqlbox_is_allowed_in_group(Octstr *group, Octstr *variable)
         fields \
         return 0; \
     }
-    #include "sqlbox/sqlbox-cfg.def"
+    #include "cdr/cdr-cfg.def"
 
     return 0;
 }
@@ -134,7 +134,7 @@ static int sqlbox_is_single_group(Octstr *query)
     #define MULTI_GROUP(name, fields) \
         if (octstr_compare(octstr_imm(#name), query) == 0) \
         return 0;
-    #include "sqlbox/sqlbox-cfg.def"
+    #include "cdr/cdr-cfg.def"
     return 0;
 }
 

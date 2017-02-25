@@ -163,13 +163,18 @@ void db_dict_destroy_item(void *ptr)
 List *db_fetch_list (DBPool *pool, Octstr *query, List *binds)
 {
 	List *result;
+	DBPoolConn *conn;
+	int ret;
+
 	if (NULL == pool->db_ops->select) {
 		panic(0, "sql_fetch not implemented for this database type.");
 	}
 #ifdef DB_TRACE
 	debug("db,c", 0, "SQL: %s", octstr_get_cstr(query));
 #endif
-	pool->db_ops->select(pool, query, binds, &result);
+	conn = dbpool_conn_consume(pool);
+	ret = dbpool_conn_select(conn, query, binds, &result);
+	dbpool_conn_produce(conn);
 	return result;
 }
 
@@ -206,15 +211,21 @@ Dict *db_fetch_dict (DBPool *pool, Octstr *query, List *binds)
 	return result;
 }
 
-void db_update(DBPool *pool, Octstr *query, List *binds)
+int db_update(DBPool *pool, Octstr *query, List *binds)
 {
+	DBPoolConn *conn;
+	int ret;
+
 	if (NULL == pool->db_ops->update) {
 		panic(0, "sql_update not implemented for this database type.");
 	}
 #ifdef DB_TRACE
 	debug("db,c", 0, "SQL: %s", octstr_get_cstr(query));
 #endif
-	pool->db_ops->update(pool, query, binds);
+	conn = dbpool_conn_consume(pool);
+	ret = dbpool_conn_update(conn, query, binds);
+	dbpool_conn_produce(conn);
+	return ret;
 }
 
 List *db_get_record(List *table, int index)

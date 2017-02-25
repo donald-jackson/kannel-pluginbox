@@ -77,7 +77,7 @@ Octstr *db_fetch_pivot (DBPool *pool, Octstr *query, List *binds);
 List *db_fetch_list (DBPool *pool, Octstr *query, List *binds);
 List *db_fetch_record (DBPool *pool, Octstr *query, List *binds);
 Dict *db_fetch_dict (DBPool *pool, Octstr *query, List *binds);
-void db_update(DBPool *pool, Octstr *query, List *binds);
+int db_update(DBPool *pool, Octstr *query, List *binds);
 Octstr *db_get_field_at(List *table, int fieldindex, int index);
 List *db_get_record(List *table, int index);
 void db_table_destroy_item(void *ptr);

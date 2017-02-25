@@ -61,37 +61,11 @@
 #include "gw/sms.h"
 #include "gwlib/db.h"
 
-#define SQLBOX_MYSQL_CREATE_LOG_TABLE "CREATE TABLE IF NOT EXISTS %S ( \
-sql_id BIGINT(20) NOT NULL AUTO_INCREMENT PRIMARY KEY, \
-momt ENUM('MO', 'MT', 'DLR') NULL, sender VARCHAR(20) NULL, \
-receiver VARCHAR(20) NULL, udhdata BLOB NULL, msgdata TEXT NULL, \
-time BIGINT(20) NULL, smsc_id VARCHAR(255) NULL, service VARCHAR(255) NULL, \
-account VARCHAR(255) NULL, id BIGINT(20) NULL, sms_type BIGINT(20) NULL, \
-mclass BIGINT(20) NULL, mwi BIGINT(20) NULL, coding BIGINT(20) NULL, \
-compress BIGINT(20) NULL, validity BIGINT(20) NULL, deferred BIGINT(20) NULL, \
-dlr_mask BIGINT(20) NULL, dlr_url VARCHAR(255) NULL, pid BIGINT(20) NULL, \
-alt_dcs BIGINT(20) NULL, rpi BIGINT(20) NULL, charset VARCHAR(255) NULL, \
-boxc_id VARCHAR(255) NULL, binfo VARCHAR(255) NULL, meta_data TEXT, \
-priority BIGINT(20) NULL, foreign_id VARCHAR(255) NULL)"
+#define SQLBOX_MYSQL_SELECT_QUERY "SELECT sql_id, momt%s FROM %S LIMIT 0,1"
 
-#define SQLBOX_MYSQL_CREATE_INSERT_TABLE "CREATE TABLE IF NOT EXISTS %S ( \
-sql_id BIGINT(20) NOT NULL AUTO_INCREMENT PRIMARY KEY, \
-momt ENUM('MO', 'MT') NULL, sender VARCHAR(20) NULL, \
-receiver VARCHAR(20) NULL, udhdata BLOB NULL, msgdata TEXT NULL, \
-time BIGINT(20) NULL, smsc_id VARCHAR(255) NULL, service VARCHAR(255) NULL, \
-account VARCHAR(255) NULL, id BIGINT(20) NULL, sms_type BIGINT(20) NULL, \
-mclass BIGINT(20) NULL, mwi BIGINT(20) NULL, coding BIGINT(20) NULL, \
-compress BIGINT(20) NULL, validity BIGINT(20) NULL, deferred BIGINT(20) NULL, \
-dlr_mask BIGINT(20) NULL, dlr_url VARCHAR(255) NULL, pid BIGINT(20) NULL, \
-alt_dcs BIGINT(20) NULL, rpi BIGINT(20) NULL, charset VARCHAR(255) NULL, \
-boxc_id VARCHAR(255) NULL, binfo VARCHAR(255) NULL, meta_data TEXT, \
-priority BIGINT(20) NULL, foreign_id VARCHAR(255) NULL)"
+#define SQLBOX_MYSQL_SELECT_LIST_QUERY "SELECT sql_id, momt%s FROM %S LIMIT 0,%ld"
 
-#define SQLBOX_MYSQL_SELECT_QUERY "SELECT sql_id, momt, %s FROM %S LIMIT 0,1"
-
-#define SQLBOX_MYSQL_SELECT_LIST_QUERY "SELECT sql_id, momt, %s FROM %S LIMIT 0,%ld"
-
-#define SQLBOX_MYSQL_INSERT_QUERY "INSERT INTO %S ( momt, %s, sql_id) VALUES ( \
+#define SQLBOX_MYSQL_INSERT_QUERY "INSERT INTO %S ( momt%s, sql_id) VALUES ( \
 %S, %S, %S, %S, %S, %S, %S, %S, %S, %S, %S, %S, %S, %S, %S, %S, \
 %S, %S, %S, %S, %S, %S, %S, %S, %S, %S, %S, NULL)"
 
@@ -101,16 +75,34 @@ static Octstr *msg_fields()
 {
 	Octstr *res = octstr_create("");
 
-#define INTEGER(name) octstr_format_append(res, ", %s", #name);
-#define OCTSTR(name) octstr_format_append(res, ", %s", #name);
-#define UUID(name) octstr_format_append(res, ", %s", #name);
+#define INTEGER(name) octstr_format_append(res, ", f_%s", #name);
+#define OCTSTR(name) octstr_format_append(res, ", f_%s", #name);
+#define UUID(name) octstr_format_append(res, ", f_%s", #name);
 #define VOID(name) /**/
-#define MSG(type, stmt) { stmt }
+#define MSG(type, stmt) { if (type == sms) { stmt } }
 #include "gw/msg-decl.h"
 #undef OCTSTR
 #undef INTEGER
 #undef UUID
 #undef VOID
+	return res;
+}
+
+static Octstr *column_defs(Octstr *tablename)
+{
+	Octstr *res = octstr_format("CREATE TABLE IF NOT EXISTS %s (sql_id BIGINT(20) NOT NULL AUTO_INCREMENT PRIMARY KEY, momt ENUM('MO', 'MT') NULL", octstr_get_cstr(tablename));
+
+#define INTEGER(name) octstr_format_append(res, ", f_%s BIGINT(20) NULL", #name);
+#define OCTSTR(name) octstr_format_append(res, ", f_%s VARCHAR(1024) NULL", #name);
+#define UUID(name) octstr_format_append(res, ", f_%s VARCHAR(255) NULL", #name);
+#define VOID(name) /**/
+#define MSG(type, stmt) { if (type == sms) { stmt } }
+#include "gw/msg-decl.h"
+#undef OCTSTR
+#undef INTEGER
+#undef UUID
+#undef VOID
+	octstr_append(res, octstr_imm(")"));
 	return res;
 }
 
@@ -126,7 +118,7 @@ static void sql_save_msg(DBPool *pool, Msg *msg, Octstr *momt, Octstr *sql_logta
 #define OCTSTR(name) gwlist_append(binds, (p->name == NULL ? NULL : octstr_duplicate(p->name)));
 #define UUID(name) uuid_unparse(p->name, uuidstr); gwlist_append(binds, octstr_create(uuidstr));
 #define VOID(name) /**/
-#define MSG(type, stmt) { struct type *p = &msg->type; stmt }
+#define MSG(type, stmt) { if (type == sms) { struct type *p = &msg->type; stmt } }
 #include "gw/msg-decl.h"
 #undef OCTSTR
 #undef INTEGER
@@ -161,7 +153,7 @@ static Msg *record_to_msg(List *record)
 #define OCTSTR(name) p->name = octstr_duplicate(gwlist_get(record, fcnt++));
 #define UUID(name) uuid_parse(gwlist_get(record, fcnt++), p->name);
 #define VOID(name) /**/
-#define MSG(type, stmt) { struct type *p = &msg->type; stmt }
+#define MSG(type, stmt) { if (type == sms) { struct type *p = &msg->type; stmt } }
 #include "gw/msg-decl.h"
 #undef OCTSTR
 #undef INTEGER
@@ -220,4 +212,19 @@ static int sql_fetch_msg_list(DBPool *pool, List *qlist, long limit, Octstr *sql
 	octstr_destroy(sql);
     }
     return ret;
+}
+
+static void sql_init_tables(DBPool *pool, Octstr *logtable, Octstr *inserttable)
+{
+	Octstr *sql;
+	if (NULL != logtable) {
+		sql = column_defs(logtable);
+		db_update(pool, sql, NULL);
+		octstr_destroy(sql);
+	}
+	if (NULL != inserttable) {
+		sql = column_defs(inserttable);
+		db_update(pool, sql, NULL);
+		octstr_destroy(sql);
+	}
 }

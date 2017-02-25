@@ -69,7 +69,7 @@ LDFLAGS = `../pb-config --libs` -L..
 DSO_EXT = so
 DSO_CFLAGS = $(CFLAGS) -fPIC
 #DSO_LDFLAGS = /usr/local/lib/kannel/libgwlib.a /usr/local/lib/kannel/libgw.a -shared
-DSO_LDFLAGS = `../pb-config --libs` -lgw -lgwlib -ldb -L../gwlib -shared
+DSO_LDFLAGS = `../pb-config --libs` -ldb -L../gwlib -lgw -lgwlib -shared
 
 srcs = $(wildcard *.c)
 objs = $(srcs:.c=.lo)

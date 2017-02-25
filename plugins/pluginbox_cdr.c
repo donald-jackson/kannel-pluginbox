@@ -143,7 +143,7 @@ void pluginbox_cdr_configure(PluginCdr *plugin_cdr, Cfg *cfg)
     CfgGroup *grp;
     Octstr *db_id;
 
-    grp = cfg_get_single_group(cfg, octstr_imm("sqlbox"));
+    grp = cfg_get_single_group(cfg, octstr_imm("plugin-cdr"));
 
     if (cfg_get_integer(&plugin_cdr->limit_per_cycle, grp, octstr_imm("limit-per-cycle")) == -1) {
         plugin_cdr->limit_per_cycle = 0;
@@ -160,10 +160,19 @@ void pluginbox_cdr_configure(PluginCdr *plugin_cdr, Cfg *cfg)
     if (cfg_get_bool(&plugin_cdr->save_dlr, grp, octstr_imm("save-dlr")) == -1)
         plugin_cdr->save_dlr = 1;
 
-    if (NULL == (db_id = cfg_get(grp, db_id))) {
-	panic(0, "No db-id set in configuration file.");
+    plugin_cdr->logtable = cfg_get(grp, octstr_imm("sql-log-table"));
+    plugin_cdr->inserttable = cfg_get(grp, octstr_imm("sql-insert-table"));
+
+    if (NULL == (db_id = cfg_get(grp, octstr_imm("db-id")))) {
+    	if (NULL == (db_id = cfg_get(grp, octstr_imm("id")))) {
+		panic(0, "No db-id set in configuration file.");
+	}
     }
     plugin_cdr->pool = db_init_shared(cfg, db_id);
+    if (NULL == plugin_cdr->pool) {
+	panic(0, "Cannot create database connection pool.");
+    }
+    sql_init_tables(plugin_cdr->pool, plugin_cdr->logtable, plugin_cdr->inserttable);
     plugin_cdr->global_sender = cfg_get(grp, octstr_imm("global-sender"));
     octstr_destroy(db_id);
 }
@@ -215,7 +224,7 @@ void pluginbox_cdr_insert_thread(void *arg)
 {
     PluginCdr *plugin_cdr = arg;
     PluginBoxMsg *pluginbox_msg;
-    List *fetched, *save_list;
+    List *fetched;
     Msg *msg;
     int consumed;
     void *context = NULL;
@@ -228,8 +237,6 @@ void pluginbox_cdr_insert_thread(void *arg)
     gwthread_sleep(5.0);
     fetched = gwlist_create();
     gwlist_add_producer(fetched);
-    save_list = gwlist_create();
-    gwlist_add_producer(save_list);
     while (plugin_cdr->running) {
 	if ( sql_fetch_msg_list(plugin_cdr->pool, fetched, plugin_cdr->limit_per_cycle, plugin_cdr->inserttable) > 0 ) {
 	    while((gwlist_len(fetched)>0) && ((msg = gwlist_consume(fetched)) != NULL )) {
@@ -241,12 +248,15 @@ void pluginbox_cdr_insert_thread(void *arg)
                 if (plugin_cdr->global_sender != NULL && (msg->sms.sender == NULL || octstr_len(msg->sms.sender) == 0)) {
                     msg->sms.sender = octstr_duplicate(plugin_cdr->global_sender);
                 }
+                if (plugin_cdr->id != NULL && (msg->sms.boxc_id == NULL || octstr_len(msg->sms.boxc_id) == 0)) {
+                    msg->sms.boxc_id = octstr_duplicate(plugin_cdr->id);
+                }
                 /* convert validity and deferred to unix timestamp */
                 if (msg->sms.validity != SMS_PARAM_UNDEFINED)
                     msg->sms.validity = time(NULL) + msg->sms.validity * 60;
                 if (msg->sms.deferred != SMS_PARAM_UNDEFINED)
                     msg->sms.deferred = time(NULL) + msg->sms.deferred * 60;
-                pluginbox_inject_message(PLUGINBOX_MESSAGE_FROM_SMSBOX, plugin_cdr->id, msg_duplicate(msg), pluginbox_cdr_injected_callback, context);
+                pluginbox_inject_message(PLUGINBOX_MESSAGE_FROM_SMSBOX, plugin_cdr->id, msg_duplicate(msg), pluginbox_cdr_injected_callback, (void *)msg->sms.foreign_id);
     
                 if (plugin_cdr->save_mt) {
                     /* convert validity & deferred back to minutes
@@ -259,9 +269,7 @@ void pluginbox_cdr_insert_thread(void *arg)
 
 	            sql_save_msg(plugin_cdr->pool, msg, octstr_imm("MT"), plugin_cdr->logtable);
                 }
-		gwlist_produce(save_list, msg);
 	    }
-	    sql_save_list(plugin_cdr->pool, save_list, octstr_imm("MT"), plugin_cdr->save_mt, plugin_cdr->logtable);
         }
         else {
             gwthread_sleep(SLEEP_BETWEEN_EMPTY_SELECTS);
@@ -269,9 +277,7 @@ void pluginbox_cdr_insert_thread(void *arg)
     }
     info(0, PLUGINBOX_LOG_PREFIX "Stopping insert thread");
     gwlist_remove_producer(fetched);
-    gwlist_remove_producer(save_list);
     gwlist_destroy(fetched, msg_destroy_item);
-    gwlist_destroy(save_list, msg_destroy_item);
 }
 
 void pluginbox_cdr_shutdown(PluginBoxPlugin *pluginbox_plugin) {

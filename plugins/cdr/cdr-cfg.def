@@ -5,7 +5,7 @@
  *
  */
 
-SINGLE_GROUP(sqlbox,
+SINGLE_GROUP(plugin-cdr,
     OCTSTR(id)
     OCTSTR(sql-log-table)
     OCTSTR(sql-insert-table)
@@ -16,4 +16,6 @@ SINGLE_GROUP(sqlbox,
     OCTSTR(save-mo)
     OCTSTR(save-mt)
     OCTSTR(save-dlr)
+    OCTSTR(global-sender)
+    OCTSTR(db-id)
 )

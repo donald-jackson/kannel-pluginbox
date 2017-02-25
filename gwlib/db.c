@@ -67,6 +67,8 @@
 #include "db.h"
 #include "db_mysql.h"
 
+#define DB_TRACE
+
 typedef struct {
 	DBPool *pool;
 	int count;
@@ -164,6 +166,9 @@ List *db_fetch_list (DBPool *pool, Octstr *query, List *binds)
 	if (NULL == pool->db_ops->select) {
 		panic(0, "sql_fetch not implemented for this database type.");
 	}
+#ifdef DB_TRACE
+	debug("db,c", 0, "SQL: %s", octstr_get_cstr(query));
+#endif
 	pool->db_ops->select(pool, query, binds, &result);
 	return result;
 }
@@ -206,6 +211,9 @@ void db_update(DBPool *pool, Octstr *query, List *binds)
 	if (NULL == pool->db_ops->update) {
 		panic(0, "sql_update not implemented for this database type.");
 	}
+#ifdef DB_TRACE
+	debug("db,c", 0, "SQL: %s", octstr_get_cstr(query));
+#endif
 	pool->db_ops->update(pool, query, binds);
 }
 

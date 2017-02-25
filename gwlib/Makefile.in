@@ -307,7 +307,7 @@ clean-sbinPROGRAMS:
 	rm -f $$list
 
 libdb.a: $(libobjs)
-	$(AR) r $@ $<
+	$(AR) r $@ $^
 	$(RANLIB) $@
 
 mostlyclean-compile:

@@ -83,7 +83,4 @@ List *db_get_record(List *table, int index);
 void db_table_destroy_item(void *ptr);
 void db_dict_destroy_item(void *ptr);
 
-
-#undef SQLBOX_TRACE
-
 #endif

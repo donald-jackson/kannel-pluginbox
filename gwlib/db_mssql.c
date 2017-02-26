@@ -67,7 +67,7 @@
 
 #include "db_mssql.h"
 
-DBPool *sqlbox_init_mssql(Cfg* cfg, Octstr *config_id)
+DBPool *db_init_mssql(Cfg* cfg, Octstr *config_id)
 {
     CfgGroup *grp;
     List *grplist;

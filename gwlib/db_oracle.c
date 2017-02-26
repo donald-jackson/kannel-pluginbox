@@ -67,7 +67,7 @@
 
 #include "db_oracle.h"
 
-DBPool *sqlbox_init_oracle(Cfg* cfg, Octstr *config_id)
+DBPool *db_init_oracle(Cfg* cfg, Octstr *config_id)
 {
     CfgGroup *grp;
     List *grplist;

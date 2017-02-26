@@ -105,11 +105,8 @@ static Octstr *column_defs(Octstr *tablename)
 	return res;
 }
 
-/* save a message in the sent sms table */
-static void sql_save_msg(DBPool *pool, Msg *msg, Octstr *momt, Octstr *sql_logtable)
+static void msg_to_binds(Msg *msg, Octstr *momt, List *binds)
 {
-    Octstr *sql, *fields;
-    List *binds = gwlist_create();
     char uuidstr[UUID_STR_LEN + 1];
 
     gwlist_append(binds, octstr_duplicate(momt));
@@ -123,6 +120,15 @@ static void sql_save_msg(DBPool *pool, Msg *msg, Octstr *momt, Octstr *sql_logta
 #undef INTEGER
 #undef UUID
 #undef VOID
+}
+
+/* save a message in the sent sms table */
+static void sql_save_msg(DBPool *pool, Msg *msg, Octstr *momt, Octstr *sql_logtable)
+{
+    Octstr *sql, *fields;
+    List *binds = gwlist_create();
+
+    msg_to_binds(msg, momt, binds);
     fields = msg_fields();
     sql = octstr_format(SQLBOX_MYSQL_INSERT_QUERY, octstr_get_cstr(sql_logtable), octstr_get_cstr(fields));
     octstr_destroy(fields);

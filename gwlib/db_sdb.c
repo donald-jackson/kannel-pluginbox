@@ -67,7 +67,7 @@
 
 #include "db_sdb.h"
 
-DBPool *sqlbox_init_sdb(Cfg* cfg, Octstr *config_id)
+DBPool *db_init_sdb(Cfg* cfg, Octstr *config_id)
 {
     CfgGroup *grp;
     List *grplist;

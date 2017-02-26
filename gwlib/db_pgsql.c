@@ -67,7 +67,7 @@
 
 #include "db_pgsql.h"
 
-DBPool *sqlbox_init_pgsql(Cfg* cfg, Octstr *config_id)
+DBPool *db_init_pgsql(Cfg* cfg, Octstr *config_id)
 {
     CfgGroup *grp;
     List *grplist;

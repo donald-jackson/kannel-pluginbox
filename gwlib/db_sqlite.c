@@ -66,7 +66,7 @@
 
 #include "db_sqlite.h"
 
-DBPool *sqlbox_init_sqlite(Cfg* cfg, Octstr *config_id)
+DBPool *db_init_sqlite(Cfg* cfg, Octstr *config_id)
 {
     CfgGroup *grp;
     List *grplist;

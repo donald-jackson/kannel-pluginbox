@@ -91,7 +91,8 @@ DBPool *db_init_mysql(Cfg *cfg, Octstr *config_id) {
          if (p != NULL && octstr_compare(p, config_id) == 0) {
              break;
          }
-         if (p != NULL) octstr_destroy(p);
+         octstr_destroy(p);
+	 p = NULL;
     }
     if (NULL == p) {
 	return NULL;

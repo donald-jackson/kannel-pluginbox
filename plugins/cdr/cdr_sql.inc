@@ -202,6 +202,7 @@ static Msg *sql_fetch_msg(DBPool *pool, Octstr *sql_insert_table)
 	sql = octstr_format(SQLBOX_MYSQL_DELETE_QUERY, sql_insert_table, id);
 	db_update(pool, sql, NULL);
 	octstr_destroy(sql);
+	gwlist_destroy(record, octstr_destroy_item);
 	return msg;
 }
 
@@ -210,6 +211,7 @@ static int sql_fetch_msg_list(DBPool *pool, List *qlist, long limit, Octstr *sql
     int ret = 0, i;
     Octstr *sql, *id, *fields;
     List *table, *record;
+    Msg *msg;
 
     fields = msg_fields();
     sql = octstr_format(SQLBOX_MYSQL_SELECT_LIST_QUERY, octstr_get_cstr(fields), sql_insert_table, limit);
@@ -222,11 +224,18 @@ static int sql_fetch_msg_list(DBPool *pool, List *qlist, long limit, Octstr *sql
     for (i = 0; i < ret; i++) {
 	record = gwlist_get(table, i);
 	id = gwlist_get(record, 0);
-	gwlist_append(qlist, record_to_msg(record));
+	msg = record_to_msg(record);
+	if (NULL != msg->sms.foreign_id) {
+		octstr_destroy(msg->sms.foreign_id);
+	}
+	// we abuse the foreign id value to save the sql id of this message.
+	msg->sms.foreign_id = octstr_duplicate(id);
+	gwlist_append(qlist, msg);
 	sql = octstr_format(SQLBOX_MYSQL_DELETE_QUERY, sql_insert_table, id);
 	db_update(pool, sql, NULL);
 	octstr_destroy(sql);
     }
+    gwlist_destroy(table, db_table_destroy_item);
     return ret;
 }
 

@@ -141,7 +141,7 @@ static int sqlbox_is_single_group(Octstr *query)
     return 0;
 }
 
-void pluginbox_cdr_configure(PluginCdr *plugin_cdr, Cfg *cfg)
+int pluginbox_cdr_configure(PluginCdr *plugin_cdr, Cfg *cfg)
 {
     CfgGroup *grp;
     Octstr *db_id;
@@ -168,16 +168,19 @@ void pluginbox_cdr_configure(PluginCdr *plugin_cdr, Cfg *cfg)
 
     if (NULL == (db_id = cfg_get(grp, octstr_imm("db-id")))) {
     	if (NULL == (db_id = cfg_get(grp, octstr_imm("id")))) {
-		panic(0, "No db-id set in configuration file.");
+		debug("plugin_cdr.c", 0, "No db-id set in configuration file.");
+		return 0;
 	}
     }
     plugin_cdr->pool = db_init_shared(cfg, db_id);
     if (NULL == plugin_cdr->pool) {
-	panic(0, "Cannot create database connection pool.");
+	debug("plugin_cdr.c", 0, "Cannot create database connection pool.");
+	return 0;
     }
     sql_init_tables(plugin_cdr->pool, plugin_cdr->logtable, plugin_cdr->inserttable);
     plugin_cdr->global_sender = cfg_get(grp, octstr_imm("global-sender"));
     octstr_destroy(db_id);
+    return 1;
 }
 
 void pluginbox_cdr_injected_callback(ack_status_t ack_status, void *context) {
@@ -200,14 +203,11 @@ static int charset_processing(Msg *msg)
 {
     gw_assert(msg->type == sms);
 
-	/* TODO: re-enable */
-#if 0
     /* URL-decode first */
     if (octstr_url_decode(msg->sms.msgdata) == -1)
         return -1;
     if (octstr_url_decode(msg->sms.udhdata) == -1)
         return -1;
-#endif
         
     /* If a specific character encoding has been indicated by the
      * user, then make sure we convert to our internal representations. */
@@ -393,6 +393,8 @@ Octstr *pluginbox_cdr_status(PluginBoxPlugin *pluginbox_plugin, List *cgivars, i
 }
 
 int pluginbox_cdr_init(PluginBoxPlugin *pluginbox_plugin) {
+	int success;
+
 	info(0, PLUGINBOX_LOG_PREFIX "Using configuration from %s", octstr_get_cstr(pluginbox_plugin->args));
 	cfg_add_hooks(sqlbox_is_allowed_in_group, sqlbox_is_single_group);
 
@@ -403,8 +405,12 @@ int pluginbox_cdr_init(PluginBoxPlugin *pluginbox_plugin) {
 		return 0;
 	}
 	pluginbox_plugin->context = pluginbox_cdr_plugin_create();
-	pluginbox_cdr_configure(pluginbox_plugin->context, cfg);
+	success = pluginbox_cdr_configure(pluginbox_plugin->context, cfg);
 	cfg_destroy(cfg);
+        if (!success) {
+		pluginbox_cdr_plugin_destroy((PluginCdr *)pluginbox_plugin->context);
+		return 0;
+	}
 	pluginbox_plugin->direction = PLUGINBOX_MESSAGE_FROM_SMSBOX | PLUGINBOX_MESSAGE_FROM_BEARERBOX;
 	pluginbox_plugin->process = pluginbox_cdr_process;
 	pluginbox_plugin->shutdown = pluginbox_cdr_shutdown;

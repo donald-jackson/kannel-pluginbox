@@ -241,7 +241,7 @@ void pluginbox_cdr_insert_thread(void *arg)
     if (0 == plugin_cdr->limit_per_cycle) {
 	return;
     }
-    if (NULL == plugin_cdr->logtable) {
+    if (NULL == plugin_cdr->inserttable) {
 	return;
     }
     info(0, PLUGINBOX_LOG_PREFIX "Starting insert thread");
@@ -272,7 +272,7 @@ void pluginbox_cdr_insert_thread(void *arg)
 #endif
                 pluginbox_inject_message(PLUGINBOX_MESSAGE_FROM_SMSBOX, plugin_cdr->id, msg_duplicate(msg), pluginbox_cdr_injected_callback, (void *)octstr_duplicate(msg->sms.foreign_id));
     
-                if (plugin_cdr->save_mt) {
+                if (plugin_cdr->save_mt && plugin_cdr->logtable) {
 #if 0
                     /* convert validity & deferred back to minutes
                     * TODO clarify why we fetched message from DB and then insert it back here???
@@ -318,18 +318,18 @@ void pluginbox_cdr_process(PluginBoxPlugin *pluginbox_plugin, PluginBoxMsg *plug
 	msg_escaped = msg_duplicate(pluginbox_msg->msg);
         switch (pluginbox_msg->msg->sms.sms_type) {
 	case report_mo:
-	    if (plugin_cdr->save_dlr) {
+	    if (plugin_cdr->save_dlr && plugin_cdr->logtable) {
 	        sql_save_msg(plugin_cdr->pool, msg_escaped, octstr_imm("DLR"), plugin_cdr->logtable);
 	    }
 	    break;
 	case mo:
-	    if (plugin_cdr->save_mo) {
+	    if (plugin_cdr->save_mo && plugin_cdr->logtable) {
 	        sql_save_msg(plugin_cdr->pool, msg_escaped, octstr_imm("MO"), plugin_cdr->logtable);
 	    }
 	    break;
 	case mt_reply:
 	case mt_push:
-	    if (plugin_cdr->save_mt) {
+	    if (plugin_cdr->save_mt && plugin_cdr->logtable) {
 	        sql_save_msg(plugin_cdr->pool, msg_escaped, octstr_imm("MT"), plugin_cdr->logtable);
 	    }
 	    break;

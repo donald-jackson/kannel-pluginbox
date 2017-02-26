@@ -344,6 +344,8 @@ Octstr *pluginbox_cdr_status(PluginBoxPlugin *pluginbox_plugin, List *cgivars, i
 	const char *fmt;
 	Octstr *value;
 	int intvalue;
+        int tableschanged = 0;
+
 	PluginCdr *plugin_cdr = (PluginCdr *)pluginbox_plugin->context;
 
 	value = http_cgi_variable(cgivars, "save-mo");
@@ -371,11 +373,16 @@ Octstr *pluginbox_cdr_status(PluginBoxPlugin *pluginbox_plugin, List *cgivars, i
 	if (value) {
 		if (plugin_cdr->logtable) octstr_destroy(plugin_cdr->logtable);
 		plugin_cdr->logtable = octstr_duplicate(value);
+		tableschanged = 1;
 	}
 	value = http_cgi_variable(cgivars, "insert-table");
 	if (value) {
 		if (plugin_cdr->inserttable) octstr_destroy(plugin_cdr->inserttable);
 		plugin_cdr->inserttable = octstr_duplicate(value);
+		tableschanged = 1;
+	}
+	if (tableschanged) {
+		sql_init_tables(plugin_cdr->pool, plugin_cdr->logtable, plugin_cdr->inserttable);
 	}
 	switch (status_type) {
 	case PLUGINSTATUS_HTML:

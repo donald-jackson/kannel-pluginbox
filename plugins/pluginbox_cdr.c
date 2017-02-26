@@ -71,7 +71,7 @@ typedef struct {
 	long insert_thread;
 	long limit_per_cycle;
 	Octstr *logtable;
-	Octstr * inserttable;
+	Octstr *inserttable;
 	volatile int running;
 } PluginCdr;
 
@@ -81,15 +81,21 @@ PluginCdr *pluginbox_cdr_plugin_create() {
     PluginCdr *plugin_cdr = gw_malloc(sizeof(PluginCdr));
     plugin_cdr->id = NULL;
     plugin_cdr->pool = NULL;
+    plugin_cdr->global_sender = NULL;
+    plugin_cdr->limit_per_cycle = 0;
+    plugin_cdr->logtable = NULL;
+    plugin_cdr->inserttable = NULL;
     return plugin_cdr;
 }
 
 void pluginbox_cdr_plugin_destroy(PluginCdr *plugin_cdr) {
     if (plugin_cdr->id) octstr_destroy(plugin_cdr->id);
+    if (plugin_cdr->global_sender) octstr_destroy(plugin_cdr->global_sender);
+    if (plugin_cdr->logtable) octstr_destroy(plugin_cdr->logtable);
+    if (plugin_cdr->inserttable) octstr_destroy(plugin_cdr->inserttable);
     if (plugin_cdr->pool) {
 	db_shutdown(plugin_cdr->pool);
     }
-    if (plugin_cdr->global_sender) octstr_destroy(plugin_cdr->global_sender);
     gw_free(plugin_cdr);
 }
 
@@ -349,20 +355,41 @@ Octstr *pluginbox_cdr_status(PluginBoxPlugin *pluginbox_plugin, List *cgivars, i
 	if (value) {
 		plugin_cdr->save_dlr = atoi(octstr_get_cstr(value)) ? 1 : 0;
 	}
+	value = http_cgi_variable(cgivars, "limit-per-cycle");
+	if (value) {
+		plugin_cdr->limit_per_cycle = atoi(octstr_get_cstr(value));
+	}
+	value = http_cgi_variable(cgivars, "global-sender");
+	if (value) {
+		if (plugin_cdr->global_sender) octstr_destroy(plugin_cdr->global_sender);
+		plugin_cdr->global_sender = octstr_duplicate(value);
+	}
+	value = http_cgi_variable(cgivars, "log-table");
+	if (value) {
+		if (plugin_cdr->logtable) octstr_destroy(plugin_cdr->logtable);
+		plugin_cdr->logtable = octstr_duplicate(value);
+	}
+	value = http_cgi_variable(cgivars, "insert-table");
+	if (value) {
+		if (plugin_cdr->inserttable) octstr_destroy(plugin_cdr->inserttable);
+		plugin_cdr->inserttable = octstr_duplicate(value);
+	}
 	switch (status_type) {
 	case PLUGINSTATUS_HTML:
+		fmt = "<table class=\"cdrtable\"><tr><td>Save MO</td><td>%d</td></tr><tr><td>Save MT</td><td>%d</td></tr><tr><td>Save DLR</td><td>%d</td></tr><tr><td>Global Sender</td><td>%s</td></tr><tr><td>Limit per cycle</td><td>%ld</td></tr><tr><td>Logtable</td><td>%s</td></tr><tr><td>Insert table</td><td>%s</td></tr></table>";
+		break;
 	case PLUGINSTATUS_WML:
-		fmt = "Configuration:<br/>\n<br/>\nSave MO: %d.<br/>\nSave MT: %d.<br/>\nSave DLR: %d.<br/>\n";
+		fmt = "Configuration:<br/>\n<br/>\nSave MO: %d.<br/>\nSave MT: %d.<br/>\nSave DLR: %d.<br/>Global Sender: %s<br/>Limit per cycle: %ld<br/>Logtable: %s<br/>Insert table: %s<br/>\n";
 		break;
 	case PLUGINSTATUS_XML:
-		fmt = "<plugin-cdr>\n    <save-mo>%d</save-mo>\n    <save-mt>%d</save-mt>\n    <save-dlr>%d</save-dlr>\n</plugin-cdr>\n";
+		fmt = "<plugin-cdr>\n    <save-mo>%d</save-mo>\n    <save-mt>%d</save-mt>\n    <save-dlr>%d</save-dlr>\n</plugin-cdr>\n<global-sender>%s</global-sender>\n<limit-per-cycle>%ld</limit-per-cycle>\n<log-table>%s</log-table>\n<insert-table>%s</insert-table>\n";
 		break;
 	case PLUGINSTATUS_TEXT:
 	default:
-		fmt = "Configuration:\n\nSave MO: %d.\nSave MT: %d.\nSave DLR: %d.\n";
+		fmt = "Configuration:\n\nSave MO: %d.\nSave MT: %d.\nSave DLR: %d.\nGlobal Sender: %s\nLimit per cycle: %ld\nLogtable: %s\nInsert table: %s\n";
 		break;
 	}
-	return octstr_format(fmt, plugin_cdr->save_mo, plugin_cdr->save_mt, plugin_cdr->save_dlr);
+	return octstr_format(fmt, plugin_cdr->save_mo, plugin_cdr->save_mt, plugin_cdr->save_dlr, plugin_cdr->global_sender ? octstr_get_cstr(plugin_cdr->global_sender) : "(not configured)", plugin_cdr->limit_per_cycle, plugin_cdr->logtable ? octstr_get_cstr(plugin_cdr->logtable) : "(not configured)", plugin_cdr->inserttable ? octstr_get_cstr(plugin_cdr->inserttable) : "(not configured)");
 }
 
 int pluginbox_cdr_init(PluginBoxPlugin *pluginbox_plugin) {

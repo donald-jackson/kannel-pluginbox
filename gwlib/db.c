@@ -176,7 +176,7 @@ void db_table_destroy_item(void *ptr)
 
 Octstr *db_fetch_pivot (DBPool *pool, Octstr *query, List *binds)
 {
-	Octstr *result = NULL;
+	Octstr *result = NULL, *pivot;
 	List *table = db_fetch_list(pool, query, binds);
 	List *record;
 	if (NULL == table) {
@@ -185,10 +185,14 @@ Octstr *db_fetch_pivot (DBPool *pool, Octstr *query, List *binds)
 	if (gwlist_len(table) > 0) {
 		record = db_get_record(table, 0);
 		if (gwlist_len(record) > 0) {
-			result = gwlist_get(record, 0);
+			pivot = gwlist_get(record, 0);
+			if (pivot) {
+				result = octstr_duplicate(pivot);
+			}
 		}
 	}
 	gwlist_destroy(table, db_table_destroy_item);
+	return result;
 }
 
 void db_dict_destroy_item(void *ptr)

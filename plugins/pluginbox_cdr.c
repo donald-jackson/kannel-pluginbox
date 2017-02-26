@@ -93,9 +93,6 @@ void pluginbox_cdr_plugin_destroy(PluginCdr *plugin_cdr) {
     if (plugin_cdr->global_sender) octstr_destroy(plugin_cdr->global_sender);
     if (plugin_cdr->logtable) octstr_destroy(plugin_cdr->logtable);
     if (plugin_cdr->inserttable) octstr_destroy(plugin_cdr->inserttable);
-    if (plugin_cdr->pool) {
-	db_shutdown(plugin_cdr->pool);
-    }
     gw_free(plugin_cdr);
 }
 
@@ -301,6 +298,9 @@ void pluginbox_cdr_shutdown(PluginBoxPlugin *pluginbox_plugin) {
 
     plugin_cdr->running = 0;
     gwthread_join(plugin_cdr->insert_thread);
+    if (plugin_cdr->pool) {
+	db_shutdown(plugin_cdr->pool);
+    }
     pluginbox_cdr_plugin_destroy(plugin_cdr);
     info(0, PLUGINBOX_LOG_PREFIX "Shutdown complete");
 }

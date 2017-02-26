@@ -96,8 +96,10 @@ found:
     if (cfg_get_integer(&pool_size, grp, octstr_imm("max-connections")) == -1 || pool_size == 0)
         pool_size = 1;
 
-    if (!(sqlite3_db = cfg_get(grp, octstr_imm("database"))))
-           panic(0, "SQLBOX: Sqlite3: directive 'database' is not specified!");
+    if (!(sqlite3_db = cfg_get(grp, octstr_imm("database")))) {
+	debug("db_sqlite3.c", 0, "SQLBOX: Sqlite3: directive 'database' is not specified!");
+	return NULL;
+    }
 
     if (cfg_get_integer(&lock_timeout, grp, octstr_imm("lock-timeout")) == -1 || lock_timeout == 0 )
            lock_timeout = 0;
@@ -119,8 +121,10 @@ found:
     /*
      * XXX should a failing connect throw panic?!
      */
-    if (dbpool_conn_count(pool) == 0)
-        panic(0,"SQLBOX: Sqlite3: database pool has no connections!");
+    if (dbpool_conn_count(pool) == 0) {
+        debug("db_sqlite3.c", 0,"SQLBOX: Sqlite3: database pool has no connections!");
+	return NULL;
+    }
 
     return pool;
 }

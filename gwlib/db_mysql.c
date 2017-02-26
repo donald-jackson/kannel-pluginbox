@@ -103,14 +103,22 @@ DBPool *db_init_mysql(Cfg *cfg, Octstr *config_id) {
     if (cfg_get_integer(&pool_size, grp, octstr_imm("max-connections")) == -1 || pool_size == 0)
         pool_size = 1;
 
-    if (!(mysql_host = cfg_get(grp, octstr_imm("host"))))
-        panic(0, "SQLBOX: MySQL: directive 'host' is not specified!");
-    if (!(mysql_user = cfg_get(grp, octstr_imm("username"))))
-        panic(0, "SQLBOX: MySQL: directive 'username' is not specified!");
-    if (!(mysql_pass = cfg_get(grp, octstr_imm("password"))))
-        panic(0, "SQLBOX: MySQL: directive 'password' is not specified!");
-    if (!(mysql_db = cfg_get(grp, octstr_imm("database"))))
-        panic(0, "SQLBOX: MySQL: directive 'database' is not specified!");
+    if (!(mysql_host = cfg_get(grp, octstr_imm("host")))) {
+	debug("db_mysql.c", 0, "SQLBOX: MySQL: directive 'host' is not specified!");
+	return NULL;
+    }
+    if (!(mysql_user = cfg_get(grp, octstr_imm("username")))) {
+	debug("db_mysql.c", 0, "SQLBOX: MySQL: directive 'username' is not specified!");
+	return NULL;
+    }
+    if (!(mysql_pass = cfg_get(grp, octstr_imm("password")))) {
+	debug("db_mysql.c", 0, "SQLBOX: MySQL: directive 'password' is not specified!");
+	return NULL;
+    }
+    if (!(mysql_db = cfg_get(grp, octstr_imm("database")))) {
+	debug("db_mysql.c", 0, "SQLBOX: MySQL: directive 'database' is not specified!");
+	return NULL;
+    }
     have_port = (cfg_get_integer(&mysql_port, grp, octstr_imm("port")) != -1);
 
     /*
@@ -139,8 +147,10 @@ DBPool *db_init_mysql(Cfg *cfg, Octstr *config_id) {
     /*
      * XXX should a failing connect throw panic?!
      */
-    if (dbpool_conn_count(pool) == 0)
-        panic(0,"SQLBOX: MySQL: database pool has no connections!");
+    if (dbpool_conn_count(pool) == 0) {
+	debug("db_mysql.c", 0,"SQLBOX: MySQL: database pool has no connections!");
+	return NULL;
+    }
 
     return pool;
 }

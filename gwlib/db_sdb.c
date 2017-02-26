@@ -102,8 +102,10 @@ found:
     if (cfg_get_integer(&pool_size, grp, octstr_imm("max-connections")) == -1 || pool_size == 0)
         pool_size = 1;
 
-    if (!(sdb_url = cfg_get(grp, octstr_imm("url"))))
-            panic(0, "SQLBOX: SDB: directive 'url' is not specified!");
+    if (!(sdb_url = cfg_get(grp, octstr_imm("url")))) {
+	debug("db_sdb.c", 0, "SQLBOX: SDB: directive 'url' is not specified!");
+	return NULL;
+    }
 
     /*
      * ok, ready to connect to Sdb
@@ -122,8 +124,10 @@ found:
     /*
      * XXX should a failing connect throw panic?!
      */
-    if (dbpool_conn_count(pool) == 0)
-        panic(0,"SQLBOX: Sdb: database pool has no connections!");
+    if (dbpool_conn_count(pool) == 0) {
+        debug("db_sdb.c", 0,"SQLBOX: Sdb: database pool has no connections!");
+	return NULL;
+    }
 
     return pool;
 }

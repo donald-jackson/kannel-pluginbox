@@ -85,50 +85,37 @@ DBPool *db_init(Cfg *cfg, Octstr *config_id)
 {
     DBPool *res;
 
-#ifdef HAVE_MYSQL
     res = db_init_mysql(cfg, config_id);
     if (res) {
         return res;
     }
-#endif
-#ifdef HAVE_MSSQL
     res = db_init_mssql(cfg, config_id);
     if (res) {
         return res;
     }
-#endif
-#ifdef HAVE_ORACLE
     res = db_init_oracle(cfg, config_id);
     if (res) {
         return res;
     }
-#endif
-#ifdef HAVE_PGSQL
     res = db_init_pgsql(cfg, config_id);
     if (res) {
         return res;
     }
-#endif
-#ifdef HAVE_SDB
     res = db_init_sdb(cfg, config_id);
     if (res) {
         return res;
     }
-#endif
-#ifdef HAVE_SQLITE
     res = db_init_sqlite(cfg, config_id);
     if (res) {
         return res;
     }
-#endif
-#ifdef HAVE_SQLITE3
     res = db_init_sqlite3(cfg, config_id);
     if (res) {
         return res;
     }
-#endif
     if (NULL == res) {
-	panic(0, "No connnection found with id %s", octstr_get_cstr(config_id));
+	debug("db.c", 0, "No connnection found with id %s", octstr_get_cstr(config_id));
+	return NULL;
     }
     return res;
 }

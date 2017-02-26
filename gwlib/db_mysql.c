@@ -95,6 +95,8 @@ DBPool *db_init_mysql(Cfg *cfg, Octstr *config_id) {
 	 p = NULL;
     }
     if (NULL == p) {
+	debug("db_mysql.c", 0, "SQLBOX: MySQL: connection settings for id '%s' are not specified!",
+           octstr_get_cstr(config_id));
 	return NULL;
     }
 

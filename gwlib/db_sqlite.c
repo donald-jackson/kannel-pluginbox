@@ -93,6 +93,8 @@ DBPool *db_init_sqlite(Cfg* cfg, Octstr *config_id)
         }
         if (p != NULL) octstr_destroy(p);
      }
+     debug("db_sqlite.c", 0, "SQLBOX: SQLite: connection settings for id '%s' are not specified!",
+           octstr_get_cstr(config_id));
      return NULL;
 
 found:

@@ -232,7 +232,7 @@ List *db_fetch_record (DBPool *pool, Octstr *query, List *binds)
 Dict *db_fetch_dict (DBPool *pool, Octstr *query, List *binds)
 {
 	List *table = db_fetch_list(pool, query, binds);
-	Dict *result = dict_create(gwlist_len(table), db_table_destroy_item);
+	Dict *result = dict_create(gwlist_len(table) + 1, db_table_destroy_item);
 	Octstr *field;
 	int i;
 	for (i = 0; i < gwlist_len(table); i++) {

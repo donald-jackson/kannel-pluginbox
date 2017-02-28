@@ -195,11 +195,6 @@ Octstr *db_fetch_pivot (DBPool *pool, Octstr *query, List *binds)
 	return result;
 }
 
-void db_dict_destroy_item(void *ptr)
-{
-	gwlist_destroy((List *)ptr, db_table_destroy_item);
-}
-
 List *db_fetch_list (DBPool *pool, Octstr *query, List *binds)
 {
 	List *result;
@@ -237,7 +232,7 @@ List *db_fetch_record (DBPool *pool, Octstr *query, List *binds)
 Dict *db_fetch_dict (DBPool *pool, Octstr *query, List *binds)
 {
 	List *table = db_fetch_list(pool, query, binds);
-	Dict *result = dict_create(gwlist_len(table), db_dict_destroy_item);
+	Dict *result = dict_create(gwlist_len(table), db_table_destroy_item);
 	Octstr *field;
 	int i;
 	for (i = 0; i < gwlist_len(table); i++) {

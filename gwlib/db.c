@@ -197,7 +197,7 @@ Octstr *db_fetch_pivot (DBPool *pool, Octstr *query, List *binds)
 
 void db_dict_destroy_item(void *ptr)
 {
-	dict_destroy((Dict *)ptr);
+	gwlist_destroy((List *)ptr, db_table_destroy_item);
 }
 
 List *db_fetch_list (DBPool *pool, Octstr *query, List *binds)

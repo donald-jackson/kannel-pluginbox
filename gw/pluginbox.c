@@ -96,9 +96,6 @@ Octstr *pluginbox_id;
 /* our status */
 volatile sig_atomic_t plugin_status;
 
-#define SLEEP_BETWEEN_EMPTY_SELECTS 1.0
-#define DEFAULT_LIMIT_PER_CYCLE 10
-
 typedef struct _boxc {
     Connection *smsbox_connection;
     Connection *bearerbox_connection;
@@ -922,13 +919,13 @@ int main(int argc, char **argv) {
 
     report_versions("pluginbox");
 
+    connected_box_lock = gw_rwlock_create();
+    connected_boxes = gwlist_create();
+
     init_pluginbox(cfg);
     
     long *pluginbox_port_ptr = gw_malloc(sizeof(long));
     *pluginbox_port_ptr = pluginbox_port;
-
-    connected_box_lock = gw_rwlock_create();
-    connected_boxes = gwlist_create();
 
     pluginboxc_run(pluginbox_port_ptr);
 

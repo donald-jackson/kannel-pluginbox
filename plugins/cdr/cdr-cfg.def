@@ -5,12 +5,17 @@
  *
  */
 
-SINGLE_GROUP(sqlbox,
+SINGLE_GROUP(plugin-cdr,
     OCTSTR(id)
     OCTSTR(sql-log-table)
+    OCTSTR(sql-insert-table)
+    OCTSTR(global-sender)
     OCTSTR(log-file)
     OCTSTR(log-level)
+    OCTSTR(limit-per-cycle)
     OCTSTR(save-mo)
     OCTSTR(save-mt)
     OCTSTR(save-dlr)
+    OCTSTR(global-sender)
+    OCTSTR(db-id)
 )

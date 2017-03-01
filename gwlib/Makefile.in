@@ -51,8 +51,7 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-sbin_PROGRAMS = pluginbox$(EXEEXT)
-subdir = gw
+subdir = gwlib
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/acinclude.m4 \
@@ -64,16 +63,16 @@ CONFIG_HEADER = $(top_builddir)/pb-config.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(sbindir)"
-PROGRAMS = $(sbin_PROGRAMS)
-am_pluginbox_OBJECTS = pluginbox.$(OBJEXT) pluginbox_plugin.$(OBJEXT) pluginbox_http.$(OBJEXT)
+libs = libdb.a
+libsrcs = $(wildcard *.c)
+libobjs = $(libsrcs:.c=.o)
 pluginbox_OBJECTS = $(am_pluginbox_OBJECTS)
-pluginbox_LDADD = $(LDADD) -ldb -L../gwlib
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/autotools/depcomp
 am__depfiles_maybe = depfiles
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
-	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
+	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -fPIC
 LTCOMPILE = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	--mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
 	$(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
@@ -224,7 +223,7 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-pluginbox_SOURCES = pluginbox.c pluginbox_plugin.c pluginbox_http.c
+pluginbox_SOURCES = $(wildcard *.c)
 EXTRA_DIST = 
 all: all-am
 
@@ -306,9 +305,10 @@ clean-sbinPROGRAMS:
 	list=`for p in $$list; do echo "$$p"; done | sed 's/$(EXEEXT)$$//'`; \
 	echo " rm -f" $$list; \
 	rm -f $$list
-pluginbox$(EXEEXT): $(pluginbox_OBJECTS) $(pluginbox_DEPENDENCIES) $(EXTRA_pluginbox_DEPENDENCIES) 
-	@rm -f pluginbox$(EXEEXT)
-	$(LINK) $(pluginbox_OBJECTS) $(pluginbox_LDADD) $(LIBS)
+
+libdb.a: $(libobjs)
+	$(AR) r $@ $^
+	$(RANLIB) $@
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -429,7 +429,7 @@ distdir: $(DISTFILES)
 	done
 check-am: all-am
 check: check-am
-all-am: Makefile $(PROGRAMS)
+all-am: Makefile $(PROGRAMS) $(libs)
 installdirs:
 	for dir in "$(DESTDIR)$(sbindir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
@@ -550,7 +550,6 @@ uninstall-am: uninstall-sbinPROGRAMS
 	maintainer-clean-generic mostlyclean mostlyclean-compile \
 	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
 	tags uninstall uninstall-am uninstall-sbinPROGRAMS
-
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

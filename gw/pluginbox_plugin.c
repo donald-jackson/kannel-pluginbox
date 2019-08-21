@@ -370,6 +370,7 @@ int pluginbox_add_plugin(Cfg *cfg, Octstr *pluginname) {
                 break;
             }
         }
+	octstr_destroy(id);
     }
     if (0 == found) {
         debug("pluginbox.plugin.add", 0, "Plugin %s not found in configuration file.", octstr_get_cstr(pluginname));

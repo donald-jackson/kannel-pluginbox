@@ -201,12 +201,14 @@ static PluginBoxPlugin *pluginbox_plugins_add(Cfg *cfg, Octstr *id, CfgGroup *gr
         if (!plugin->init) {
             error(0, "init-function %s unable to load from %s", octstr_get_cstr(tmp_str),
                   octstr_get_cstr(plugin->path));
+	    octstr_destroy(tmp_str);
             pluginbox_plugin_destroy(plugin);
             return NULL;
         }
         plugin->args = cfg_get(grp, octstr_imm("args"));
         if (!plugin->init(plugin)) {
             error(0, "Plugin %s initialization failed", octstr_get_cstr(plugin->path));
+	    octstr_destroy(tmp_str);
             pluginbox_plugin_destroy(plugin);
             return NULL;
         } else {
@@ -214,6 +216,7 @@ static PluginBoxPlugin *pluginbox_plugins_add(Cfg *cfg, Octstr *id, CfgGroup *gr
         }
     } else {
         error(0, "No initialization 'init' function specified, cannot continue (%s)", octstr_get_cstr(plugin->path));
+	octstr_destroy(tmp_str);
         pluginbox_plugin_destroy(plugin);
         return NULL;
     }
@@ -370,6 +373,7 @@ int pluginbox_add_plugin(Cfg *cfg, Octstr *pluginname) {
                 break;
             }
         }
+	octstr_destroy(id);
     }
     if (0 == found) {
         debug("pluginbox.plugin.add", 0, "Plugin %s not found in configuration file.", octstr_get_cstr(pluginname));

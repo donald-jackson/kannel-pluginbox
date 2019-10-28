@@ -723,9 +723,6 @@ static void wait_for_connections(int fd, void (*function) (void *arg),
 
     gw_assert(function != NULL);
     
-    int *fdptr = gw_malloc(sizeof(int));
-    *fdptr = fd;
-
     while (pluginbox_status == PLUGIN_RUNNING) {
 
         ret = gwthread_pollfd(fd, POLLIN, 1.0);
@@ -737,7 +734,7 @@ static void wait_for_connections(int fd, void (*function) (void *arg),
         }
 
         if (ret > 0) {
-            gwthread_create(function, fdptr);
+            gwthread_create(function, &fd);
             gwthread_sleep(1.0);
         } else if (ret < 0) {
             if (errno == EINTR) continue;
@@ -924,10 +921,7 @@ int main(int argc, char **argv) {
 
     init_pluginbox(cfg);
     
-    long *pluginbox_port_ptr = gw_malloc(sizeof(long));
-    *pluginbox_port_ptr = pluginbox_port;
-
-    pluginboxc_run(pluginbox_port_ptr);
+    pluginboxc_run(&pluginbox_port);
 
     cfg_destroy(cfg);
     if (restart_pluginbox) {
@@ -940,9 +934,10 @@ int main(int argc, char **argv) {
     gwlist_destroy(connected_boxes, NULL);
     gw_rwlock_destroy(connected_box_lock);
 
-    gwlib_shutdown();
-
     if (NULL != cfg_filename) octstr_destroy(cfg_filename);
+    if (NULL != bearerbox_host) octstr_destroy(bearerbox_host);
+
+    gwlib_shutdown();
 
     if (restart_pluginbox)
         execvp(argv[0], argv);

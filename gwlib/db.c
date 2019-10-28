@@ -225,7 +225,7 @@ List *db_fetch_record (DBPool *pool, Octstr *query, List *binds)
 	}
 	result = gwlist_get(table, 0);
 	gwlist_delete(table, 0, 1);
-	db_table_destroy_item(table);
+	gwlist_destroy(table, db_table_destroy_item);
 	return result;
 }
 
